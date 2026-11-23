@@ -40,6 +40,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Async database layer: SQLAlchemy 2 + asyncpg engine created at startup and disposed at
   shutdown, a per-request session dependency, a declarative base with constraint naming
   conventions, and `GET /health/ready` (503 when a dependency is down) (AITP-13).
+- Alembic migrations (async, URL from settings, dated file names) with a baseline that enables
+  TimescaleDB and pgvector; `pnpm db:migrate`; migrations ship in the Docker image (AITP-14).
 
 ### Changed
 

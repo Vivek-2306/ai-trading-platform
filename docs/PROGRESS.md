@@ -42,10 +42,11 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 - Phase 2 merged (PR #2). "API (Python)" is a required check on `main` and `develop`.
 - Phase 3: AITP-12 dev Compose stack (TimescaleDB 2.32 + pgvector 0.8 verified, Redis 7), `pnpm infra:*`.
 - AITP-13 async SQLAlchemy engine/sessions, `Base` naming conventions, `/health/ready` (verified 200 against dev DB, 503 when down); 41 tests.
+- AITP-14 Alembic + baseline migration `0001` (timescaledb, vector); upgrade/downgrade/upgrade verified on dev DB and from the image; 44 tests.
 
 ## In progress
 
-Phase 3 tickets, in order AITP-14 … AITP-17.
+Phase 3 tickets, in order AITP-15 … AITP-17.
 
 ## Next up
 
