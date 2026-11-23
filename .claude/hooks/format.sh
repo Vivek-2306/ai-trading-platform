@@ -13,7 +13,7 @@ file="$(jq -r '.tool_response.filePath // .tool_input.file_path // empty' 2>/dev
 case "$file" in
   *.py)
     if [ -f "$root/apps/api/pyproject.toml" ] && command -v uv >/dev/null 2>&1; then
-      uv run --quiet --project "$root/apps/api" ruff format --quiet "$file" >/dev/null 2>&1
+      uv run --quiet --no-sync --project "$root/apps/api" ruff format --quiet "$file" >/dev/null 2>&1
     fi
     ;;
   *.ts|*.tsx|*.js|*.jsx|*.json|*.jsonc)

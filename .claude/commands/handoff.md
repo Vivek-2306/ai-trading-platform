@@ -4,7 +4,7 @@ description: Wrap up this session so another device (laptop or cloud) can contin
 
 Hand off the current work.
 
-1. Commit any finished work as `<ID>: <summary>` and push the branch. Don't commit
+1. Commit any finished work as `<ID>: <summary>` and push with `git push origin <branch>`. Don't commit
    half-done work; describe it in PROGRESS instead.
 2. In Notion, clear Locked by on every ticket this environment holds. Leave Status as it is.
 3. Update `docs/PROGRESS.md`: current phase, last completed, in progress (with exact next

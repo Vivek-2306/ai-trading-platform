@@ -28,7 +28,12 @@ implemented; PR into `develop` being opened for owner review.
 
 ## In progress
 
-Phase 1 PR into `develop` (owner review).
+Phase 1 PR #1 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/1
+Owner approved the self-review fixes ("yes + protect"): permissions tightened, workflow
+wording fixed, branch protection enabled on `main` and `develop`.
+Open: the deny rule `Bash(* .env.*)` is too broad (it blocks any command that merely
+mentions an env file name, e.g. commit messages). Owner to decide whether to narrow it
+to reader commands (cat/less/more/head/tail/grep/source).
 
 ## Next up
 
@@ -36,6 +41,8 @@ Phase 1 PR into `develop` (owner review).
 2. Phase 2 — Backend API skeleton (AITP-6 … AITP-11) after the owner says "go".
 3. Note: `.claude/settings.json` was created mid-session; restart Claude Code (or open
    `/hooks`) so its permissions and hook load.
+4. AITP-11 must add the CI check as a required status check on `main` and `develop`
+   (branch protection is on since 2026-11-23, without required checks because CI doesn't exist yet).
 
 ## Open questions (owner decisions)
 
