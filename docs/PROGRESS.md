@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Phase 2 — Backend API skeleton** on `phase-2-api-skeleton` (AITP-6 … AITP-11).
-Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
+**Phase 3 — Local infrastructure and data layer** on `phase-3-data-layer` (AITP-12 … AITP-17).
+Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and closed out.
 
 ## Last completed
 
@@ -39,19 +39,22 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 - Self-review fixes applied (headers on errors, no input echo, CORS wildcard rejected, 500s logged,
   JSON-only prod logs); 34 tests.
 
+- Phase 2 merged (PR #2). "API (Python)" is a required check on `main` and `develop`.
+- Phase 3: AITP-12 dev Compose stack (TimescaleDB 2.32 + pgvector 0.8 verified, Redis 7), `pnpm infra:*`.
+
 ## In progress
 
-Phase 2 PR #2 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/2
-CI green (22 s). "API (Python)" is a required check on `main` and `develop` (branch must be
-up to date before merging).
+Phase 3 tickets, in order AITP-13 … AITP-17.
 
 ## Next up
 
-1. Owner reviews and merges PR #2; then `/release-phase 2`.
-2. Phase 3 — Local infrastructure and data layer (AITP-12 … AITP-17) after the owner says "go".
-3. Open owner decision: the deny rule `Bash(* .env.*)` is too broad (blocks any command that
-   merely mentions an env file name, e.g. commit messages). Proposed: narrow it to reader
-   commands (cat/less/more/head/tail/grep/source).
+1. Finish Phase 3, open its PR into `develop`.
+2. Owner decisions on permissions:
+   - The deny rule `Bash(* .env.*)` is too broad (blocks any command that merely mentions an
+     env file name, e.g. commit messages). Proposed: narrow it to reader commands.
+   - `Read(**/.env.*)` also blocks *editing* the example env file. Pending addition there:
+     `POSTGRES_PORT=5432` and `REDIS_PORT=6379` (optional; the compose file has defaults).
+     Either the owner adds them, or allows Claude to edit the example file.
 
 ## Open questions (owner decisions)
 

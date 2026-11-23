@@ -34,6 +34,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   echo submitted values; `CORS_ORIGINS=*` is rejected; failed requests are still logged
   with status 500 and request context is cleared after each request; uvicorn/stdlib logs
   are JSON in production and the duplicate access log is off (AITP-8 … AITP-11).
+- Dev Compose stack finalised: Postgres 17 + TimescaleDB + pgvector and Redis 7 with
+  healthchecks, named volumes, localhost-only ports and env-driven credentials;
+  `pnpm infra:up/down/logs/ps` (AITP-12).
 
 ### Changed
 
