@@ -20,7 +20,8 @@
     "infra:ps": "docker compose --project-directory . -f infra/docker-compose.dev.yml ps",
     "db:migrate": "pnpm --filter @aitp/api db:migrate",
     "worker": "pnpm --filter @aitp/api worker",
-    "beat": "pnpm --filter @aitp/api beat"
+    "beat": "pnpm --filter @aitp/api beat",
+    "test:integration": "pnpm --filter @aitp/api test:integration"
   },
   "devDependencies": {
     "turbo": "^2.11.13"

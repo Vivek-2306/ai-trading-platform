@@ -46,6 +46,15 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   database and Redis separately (AITP-15).
 - Celery worker and beat on Redis (JSON-only, acks-late, one task at a time, UTC, structlog
   logging) with a `ping` task and a minutely `heartbeat`; `pnpm worker` / `pnpm beat` (AITP-16).
+- Integration tests against real TimescaleDB and Redis via testcontainers (migrations
+  up/down/up, readiness healthy and unhealthy, DB session and Redis round-trips), run in CI;
+  `pnpm test:integration` (AITP-17).
+
+### Changed (Phase 3)
+
+- Dev database image switched from `timescaledb-ha:pg17` (3.7 GB) to the pinned
+  `timescale/timescaledb:2.32.1-pg17` (same TimescaleDB 2.32.1 + pgvector 0.8.7, smaller),
+  shared by dev, tests and CI (AITP-17).
 
 ### Changed
 

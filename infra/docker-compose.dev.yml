@@ -8,8 +8,8 @@ name: aitp
 
 services:
   db:
-    # Postgres 17 + TimescaleDB + pgvector (and more) in one image.
-    image: timescale/timescaledb-ha:pg17
+    # Postgres 17 + TimescaleDB + pgvector. Same pinned image as the integration tests and CI.
+    image: timescale/timescaledb:2.32.1-pg17
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-trading}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading_dev} # dev-only default; never reuse
@@ -17,7 +17,7 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - db-data:/home/postgres/pgdata
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading} -d ${POSTGRES_DB:-trading}"]
       interval: 5s
@@ -40,5 +40,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  db-data:
+  pg-data:
   redis-data:

@@ -45,10 +45,11 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 - AITP-14 Alembic + baseline migration `0001` (timescaledb, vector); upgrade/downgrade/upgrade verified on dev DB and from the image; 44 tests.
 - AITP-15 async Redis client + readiness check (live: 200 → 503 when Redis stopped → 200); 46 tests.
 - AITP-16 Celery app + `ping`/`heartbeat` tasks, beat schedule; live round-trip through Redis verified; 51 tests.
+- AITP-17 integration tests (5) with testcontainers, in CI; dev DB image switched to pinned `timescale/timescaledb:2.32.1-pg17`.
 
 ## In progress
 
-Phase 3: AITP-17 (integration tests), then the phase PR.
+Phase 3 completion: self-review of the diff, then the PR into `develop`.
 
 ## Next up
 
@@ -72,6 +73,9 @@ Phase 3: AITP-17 (integration tests), then the phase PR.
 These are needed before feature phases, not before setup Phases 1–6.
 
 ## Known issues
+
+- Old dev volume `aitp_db-data` (from the previous timescaledb-ha image) is unused; the owner
+  can delete it with `docker volume rm aitp_db-data` (it only held an empty dev database).
 
 - Non-Claude prices in `docs/COSTS.md` are approximate and were not verified live.
 

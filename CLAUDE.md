@@ -76,14 +76,15 @@ Python backend included (`apps/api/package.json` wraps the uv commands).
 | Lint | `pnpm lint` | `uv run ruff check . && uv run ruff format --check .` |
 | Format | `pnpm format` | `uv run ruff format . && uv run ruff check --fix .` |
 | Typecheck | `pnpm typecheck` | `uv run mypy` (strict) |
-| Test | `pnpm test` | `uv run pytest` (coverage printed; warnings fail) |
+| Test | `pnpm test` | `uv run pytest` (unit; coverage printed; warnings fail) |
+| Integration tests | `pnpm test:integration` | `uv run pytest -m integration` (needs Docker; starts its own TimescaleDB + Redis) |
 | Dev DB + Redis | `pnpm infra:up` / `infra:down` / `infra:logs` / `infra:ps` | Postgres 17 + TimescaleDB + pgvector on 127.0.0.1:5432, Redis on :6379 |
 | Migrate DB | `pnpm db:migrate` | `uv run alembic upgrade head` · `downgrade -1` · `revision --autogenerate -m "..."` (import new models in `app/data/models/__init__.py`) |
 | Workers | `pnpm worker` / `pnpm beat` | `uv run celery -A app.worker.celery_app worker` / `beat` (needs `pnpm infra:up`) |
 | Run API | `pnpm dev` | `uv run uvicorn app.main:create_app --factory --reload` → http://localhost:8000/docs |
 
 Python config lives in `apps/api/pyproject.toml` (Ruff rules, mypy strict + pydantic plugin,
-pytest with `asyncio_mode = auto`, `integration` marker for tests needing Docker).
+pytest with `asyncio_mode = auto`; tests marked `integration` are skipped unless `-m integration`).
 
 ## Workflow rules
 
