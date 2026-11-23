@@ -39,7 +39,7 @@ docs/           Plans, architecture, ADRs, progress
 
 ## Quickstart
 
-Requirements: Node 24, pnpm 9, Python 3.13, uv, Docker.
+Requirements: Node 24, pnpm 9, Python 3.13, uv, Docker, jq (used by the Claude Code format hook).
 
 ```bash
 cp .env.example .env          # fill in values; never commit .env

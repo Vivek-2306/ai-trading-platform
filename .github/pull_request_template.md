@@ -16,9 +16,8 @@
 
 <!-- Commands run and their results (lint, typecheck, tests), plus any manual checks. -->
 
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
+- [ ] `pnpm lint` / `pnpm typecheck` / `pnpm test` (TypeScript, via Turborepo)
+- [ ] `uv run ruff check` / `uv run mypy .` / `uv run pytest` (in `apps/api`, once it exists)
 
 ## Risky areas to review first
 

@@ -15,3 +15,5 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Claude Code workflow commands: `/plan-project`, `/start-phase`, `/work-phase`,
   `/work-ticket`, `/phase-status`, `/handoff`, `/address-review`, `/release-phase` (AITP-5).
 - Planning docs, ADRs 0001–0002 and the local dev Compose file (project setup).
+
+[Unreleased]: https://github.com/Vivek-2306/ai-trading-platform/compare/main...develop
