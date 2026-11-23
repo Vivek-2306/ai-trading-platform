@@ -20,6 +20,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Python backend project in `apps/api`: uv, Python 3.13, FastAPI/Uvicorn/Pydantic/structlog/httpx,
   module layout for api, core, data, analysis, signals, risk, execution, backtest (AITP-6).
+- Python tooling: Ruff (lint + format), mypy strict, pytest with coverage; `pnpm lint`,
+  `typecheck`, `test` and `format` now include the backend (AITP-7).
 
 ### Changed
 

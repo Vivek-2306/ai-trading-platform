@@ -67,14 +67,19 @@ each item when it's met. Phase rows track Status, Branch, PR and Release tag.
 
 ## Commands
 
-Not scaffolded yet (setup Step 2). Planned — replace with the real ones once they work:
+From the repo root, `pnpm <task>` runs every package's task through Turborepo, the
+Python backend included (`apps/api/package.json` wraps the uv commands).
 
-| Task | Python (`apps/api`) | TypeScript (root) |
+| Task | Everything (root) | Python only (in `apps/api`) |
 | --- | --- | --- |
-| Install | `uv sync` | `pnpm install` |
-| Lint | `uv run ruff check . && uv run ruff format --check .` | `pnpm lint` |
-| Typecheck | `uv run mypy .` | `pnpm typecheck` |
-| Test | `uv run pytest` | `pnpm test` |
+| Install | `pnpm install` + `uv sync` (in `apps/api`) | `uv sync` |
+| Lint | `pnpm lint` | `uv run ruff check . && uv run ruff format --check .` |
+| Format | `pnpm format` | `uv run ruff format . && uv run ruff check --fix .` |
+| Typecheck | `pnpm typecheck` | `uv run mypy` (strict) |
+| Test | `pnpm test` | `uv run pytest` (coverage printed) |
+
+Python config lives in `apps/api/pyproject.toml` (Ruff rules, mypy strict + pydantic plugin,
+pytest with `asyncio_mode = auto`, `integration` marker for tests needing Docker).
 
 ## Workflow rules
 
