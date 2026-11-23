@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 
 import pytest
+import structlog
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
@@ -97,3 +98,33 @@ def test_validation_error_uses_error_format(error_client: TestClient) -> None:
     body = response.json()["error"]
     assert body["code"] == "validation_error"
     assert body["details"][0]["loc"] == ["path", "item_id"]
+
+
+def test_method_not_allowed_keeps_allow_header(client: TestClient) -> None:
+    response = client.post("/health")
+
+    assert response.status_code == 405
+    assert response.headers["Allow"] == "GET"
+    assert response.json()["error"]["code"] == "http_405"
+
+
+def test_validation_details_do_not_echo_input(error_client: TestClient) -> None:
+    response = error_client.get("/items/secret-value")
+
+    detail = response.json()["error"]["details"][0]
+    assert set(detail) == {"loc", "msg", "type"}
+    assert "secret-value" not in response.text
+
+
+def test_failed_request_is_still_logged_with_status_500(error_client: TestClient) -> None:
+    with capture_logs() as logs:
+        error_client.get("/boom")
+
+    entry = next(log for log in logs if log["event"] == "request")
+    assert entry["status"] == 500
+
+
+def test_request_context_is_cleared_after_request(client: TestClient) -> None:
+    client.get("/health", headers={"X-Request-ID": "leaky"})
+
+    assert structlog.contextvars.get_contextvars() == {}

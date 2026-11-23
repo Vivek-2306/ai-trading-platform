@@ -3,6 +3,7 @@
 {"error": {"code": "...", "message": "...", "request_id": "...", "details": [...]?}}
 """
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -30,6 +31,7 @@ def _error_response(
     code: str,
     message: str,
     details: Any = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     request_id = _request_id(request)
     body: dict[str, Any] = {"code": code, "message": message, "request_id": request_id}
@@ -38,20 +40,35 @@ def _error_response(
     return JSONResponse(
         status_code=status_code,
         content={"error": body},
-        headers={REQUEST_ID_HEADER: request_id},
+        # Keep headers the exception carries (Allow on 405, WWW-Authenticate on 401).
+        headers={**(headers or {}), REQUEST_ID_HEADER: request_id},
     )
 
 
 async def _http_error(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, StarletteHTTPException)
     message = exc.detail if isinstance(exc.detail, str) else "Request failed"
-    return _error_response(request, exc.status_code, f"http_{exc.status_code}", message)
+    return _error_response(
+        request, exc.status_code, f"http_{exc.status_code}", message, headers=exc.headers
+    )
+
+
+def _safe_validation_details(errors: Sequence[Any]) -> list[dict[str, Any]]:
+    """Where and why validation failed, without echoing the submitted values back."""
+    return [
+        {"loc": error.get("loc"), "msg": error.get("msg"), "type": error.get("type")}
+        for error in errors
+    ]
 
 
 async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
     return _error_response(
-        request, 422, "validation_error", "Request validation failed", details=exc.errors()
+        request,
+        422,
+        "validation_error",
+        "Request validation failed",
+        details=_safe_validation_details(exc.errors()),
     )
 
 

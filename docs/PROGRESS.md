@@ -32,14 +32,17 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
   proved working on a `.py` edit.
 - AITP-8 FastAPI `create_app()` factory, settings, `/health`, `/version`, `/docs`; 10 tests, 100% coverage of app code.
 - AITP-9 structlog (JSON in prod), X-Request-ID middleware, consistent JSON errors; 24 tests.
-- AITP-10 Dockerfile committed (`1423cb4`); local build/run check BLOCKED: Docker Desktop is
-  waiting on a macOS password prompt the owner must approve.
-- AITP-11 CI workflow (`.github/workflows/ci.yml`, job "API (Python)").
+- AITP-10 Dockerfile (`1423cb4`): image builds (263 MB), container answers `/health` and
+  `/version`, runs as non-root `app`, JSON logs. (Docker Desktop needed the owner's macOS
+  password once.)
+- AITP-11 CI workflow (`.github/workflows/ci.yml`, job "API (Python)"), with image smoke test.
+- Self-review fixes applied (headers on errors, no input echo, CORS wildcard rejected, 500s logged,
+  JSON-only prod logs); 34 tests.
 
 ## In progress
 
-Finish AITP-10 (local Docker check) once Docker Desktop is running; then open the Phase 2 PR,
-wait for CI, and make "API (Python)" a required check on `main` and `develop`.
+Phase 2 completion: self-review of the diff, then the PR into `develop`, CI, and making
+"API (Python)" a required check on `main` and `develop`.
 
 ## Next up
 

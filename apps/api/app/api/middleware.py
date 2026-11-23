@@ -35,9 +35,13 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         )
 
         started = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = round((time.perf_counter() - started) * 1000, 2)
-
-        response.headers[REQUEST_ID_HEADER] = request_id
-        logger.info("request", status=response.status_code, duration_ms=duration_ms)
-        return response
+        status = 500  # if the route raises, the error handler answers with a 500
+        try:
+            response = await call_next(request)
+            status = response.status_code
+            response.headers[REQUEST_ID_HEADER] = request_id
+            return response
+        finally:
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.info("request", status=status, duration_ms=duration_ms)
+            structlog.contextvars.clear_contextvars()

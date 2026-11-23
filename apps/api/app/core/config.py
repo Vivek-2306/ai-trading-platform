@@ -52,6 +52,14 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
+    @field_validator("cors_origins")
+    @classmethod
+    def _reject_wildcard_origin(cls, origins: list[str]) -> list[str]:
+        """The API allows credentials, so a wildcard would let any site call it as the user."""
+        if "*" in origins:
+            raise ValueError("CORS_ORIGINS must list exact origins; '*' is not allowed")
+        return origins
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

@@ -28,7 +28,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - API Dockerfile: multi-stage uv build, slim non-root runtime, healthcheck on `/health`,
   `GIT_SHA` build arg; settings no longer assume the monorepo layout at runtime (AITP-10).
 - GitHub Actions CI: on PRs and pushes to `develop`/`main`, the API job installs with a uv
-  cache, runs Ruff, mypy and pytest, and builds the Docker image (AITP-11).
+  cache, runs Ruff, mypy and pytest, builds the Docker image and smoke-tests it; actions
+  pinned to commit SHAs (AITP-11).
+- Self-review fixes: error responses keep headers like `Allow`; validation errors no longer
+  echo submitted values; `CORS_ORIGINS=*` is rejected; failed requests are still logged
+  with status 500 and request context is cleared after each request; uvicorn/stdlib logs
+  are JSON in production and the duplicate access log is off (AITP-8 … AITP-11).
 
 ### Changed
 

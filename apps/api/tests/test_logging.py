@@ -1,6 +1,7 @@
 """Tests for log output format per environment."""
 
 import json
+import logging
 
 import pytest
 
@@ -42,3 +43,25 @@ def test_log_level_filters_lower_levels(capsys: pytest.CaptureFixture[str]) -> N
     out = capsys.readouterr().out
     assert "hidden" not in out
     assert "shown" in out
+
+
+def test_stdlib_and_uvicorn_logs_are_json_in_production(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_logging(Settings(_env_file=None, app_env="production"))
+
+    logging.getLogger("uvicorn.error").warning("server_started")
+
+    record = json.loads(capsys.readouterr().err.strip().splitlines()[-1])
+    assert record["event"] == "server_started"
+    assert record["level"] == "warning"
+    assert record["logger"] == "uvicorn.error"
+
+
+def test_uvicorn_access_log_is_silenced(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(Settings(_env_file=None, app_env="production"))
+
+    logging.getLogger("uvicorn.access").warning("GET /health 200")
+
+    captured = capsys.readouterr()
+    assert "GET /health" not in captured.out + captured.err

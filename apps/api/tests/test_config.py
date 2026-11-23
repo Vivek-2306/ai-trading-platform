@@ -55,7 +55,21 @@ def test_repo_root_is_none_outside_monorepo(tmp_path: Path) -> None:
     assert _find_repo_root(nested) is None
 
 
-def test_get_settings_is_cached() -> None:
+def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core.config import get_settings
 
-    assert get_settings() is get_settings()
+    # Don't read the developer's real env file.
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    get_settings.cache_clear()
+    try:
+        assert get_settings() is get_settings()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("origins", ["*", "http://localhost:3000,*"])
+def test_rejects_wildcard_cors_origin(monkeypatch: pytest.MonkeyPatch, origins: str) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", origins)
+
+    with pytest.raises(ValidationError, match="not allowed"):
+        Settings(_env_file=None)
