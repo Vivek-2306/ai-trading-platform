@@ -90,16 +90,21 @@ Not scaffolded yet (setup Step 2). Planned — replace with the real ones once t
    ticket, tick its acceptance criteria, Status = Done, clear Locked by.
 5. After 2 failed attempts or any unclear requirement: comment on the ticket, set Blocked or
    Needs Decision, move to the next ticket.
-6. After each ticket: update `docs/PROGRESS.md` (done, next, open questions, session log).
+6. After each ticket: update `docs/PROGRESS.md` (done, next, open questions, session log) and
+   the CHANGELOG.md Unreleased section, in that ticket's commit.
 7. Big technical choices → new ADR in `docs/decisions/`.
 8. Scope changes: update `docs/PLAN.md` first, then Notion. PLAN.md = source of truth for
    scope; Notion = source of truth for status.
-9. Phase completion: all tickets Done → rebase on latest `develop` → full checks → self-review the
-   whole diff with a fresh subagent and fix issues → push → `gh pr create` with the PR
-   template → tickets to In Review with PR URL → CHANGELOG.md (Unreleased) → give owner the link.
+9. Phase completion: all tickets Done → merge the latest `origin/develop` into the phase
+   branch (never rebase a pushed branch; that would need a force push) → full checks →
+   self-review the whole diff with a fresh subagent and fix issues → push → `gh pr create
+   --base develop` with the PR template → tickets and phase row to In Review with PR URL →
+   give owner the link.
 10. Wait for CI to pass; if it fails, fix it before saying the PR is ready.
-11. NEVER merge PRs, force-push, or push to `main` or `develop` directly. Never read `.env` files or use
-    production credentials. No live-trading code path may bypass the risk engine.
+11. NEVER merge PRs, force-push, or push to `main` or `develop` directly (GitHub branch
+    protection also blocks it). Never read `.env` files or use production credentials; read
+    `.env.example` with `git show HEAD:.env.example`. No live-trading code path may bypass
+    the risk engine.
 
 Phase size: 5–8 tickets, roughly ≤600 changed lines per PR; split bigger phases (3a/3b).
 

@@ -4,8 +4,8 @@
 
 ## Current phase
 
-Setup phases planned (Phase 1–6, AITP-1 … AITP-35). Waiting for the owner to review the
-tickets and say "go" for Phase 1. No application code yet.
+**Phase 1 — Repo foundation and workflow** on `phase-1-repo-foundation`. AITP-1 … AITP-5
+implemented; PR into `develop` being opened for owner review.
 
 ## Last completed
 
@@ -20,18 +20,29 @@ tickets and say "go" for Phase 1. No application code yet.
 - Local git-ignored `private/` folder created for personal notes.
 - Planning docs, ADR 0001 (stack, proposed) and ADR 0002 (Docker Compose, accepted).
 
+- Owner said "go" (stack approved, ADR 0001 Accepted). First commit `bbd94fc` on `develop`;
+  `main` created at the same commit; `develop` is GitHub's default branch.
+- Phase 1: AITP-1 monorepo root (`d680fa6`), AITP-2 README/CHANGELOG/.env.example (`9e17c0a`),
+  AITP-3 GitHub templates (`9e2932e`), AITP-4 Claude settings + format hook (`ef0bf7c`),
+  AITP-5 slash commands.
+
 ## In progress
 
-Nothing. Waiting for the owner's review.
+Phase 1 PR #1 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/1
+Owner approved the self-review fixes ("yes + protect"): permissions tightened, workflow
+wording fixed, branch protection enabled on `main` and `develop`.
+Open: the deny rule `Bash(* .env.*)` is too broad (it blocks any command that merely
+mentions an env file name, e.g. commit messages). Owner to decide whether to narrow it
+to reader commands (cat/less/more/head/tail/grep/source).
 
 ## Next up
 
-1. Owner reviews tickets in Notion and says "go" for Phase 1 (this also counts as approving the stack).
-2. On "go": first commit on `develop` ("chore: project setup" — `.gitignore`, `CLAUDE.md`,
-   `docs/`, `infra/`), push `develop`, create `main` at that same commit, set `develop` as
-   GitHub's default branch. Then branch `phase-1-repo-foundation` from `develop` and work
-   AITP-1 … AITP-5.
-3. Open the Phase 1 PR into `develop`, wait for owner review and merge.
+1. Owner reviews and merges the Phase 1 PR; then `/release-phase 1`.
+2. Phase 2 — Backend API skeleton (AITP-6 … AITP-11) after the owner says "go".
+3. Note: `.claude/settings.json` was created mid-session; restart Claude Code (or open
+   `/hooks`) so its permissions and hook load.
+4. AITP-11 must add the CI check as a required status check on `main` and `develop`
+   (branch protection is on since 2026-11-23, without required checks because CI doesn't exist yet).
 
 ## Open questions (owner decisions)
 
@@ -54,3 +65,4 @@ These are needed before feature phases, not before setup Phases 1–6.
 | --- | --- | --- |
 | 2026-11-23 | laptop | Setup answers, prerequisites, plan doc, project memory files, Docker Compose decision |
 | 2026-11-23 | laptop | GitHub repo created; Notion phases/tickets DBs + 35 tickets; PLAN.md; working mode → Claude implements, owner reviews PRs |
+| 2026-11-23 | laptop | Branching → develop/main; first commit on develop; Phase 1 (AITP-1 … 5) implemented, PR opened |
