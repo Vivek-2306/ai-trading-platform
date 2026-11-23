@@ -10,7 +10,7 @@
     "test": "uv run pytest",
     "db:migrate": "uv run alembic upgrade head",
     "worker": "uv run celery -A app.worker.celery_app worker --loglevel=info",
-    "beat": "uv run celery -A app.worker.celery_app beat --loglevel=info --schedule=data/celerybeat-schedule",
+    "beat": "mkdir -p data && uv run celery -A app.worker.celery_app beat --loglevel=info --schedule=data/celerybeat-schedule",
     "test:integration": "uv run pytest -m integration"
   }
 }

@@ -48,7 +48,7 @@ jobs:
         run: uv run pytest
 
       - name: Integration tests (real TimescaleDB + Redis via testcontainers)
-        run: uv run pytest -m integration
+        run: uv run pytest -m integration --cov-append
 
       - name: Build Docker image
         run: docker build --build-arg GIT_SHA=${GITHUB_SHA::7} -t aitp-api:ci .

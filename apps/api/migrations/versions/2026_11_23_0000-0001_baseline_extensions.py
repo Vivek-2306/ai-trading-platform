@@ -23,5 +23,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # No CASCADE on purpose: once hypertables or vector columns exist, these fail instead
+    # of silently deleting data.
     op.execute("DROP EXTENSION IF EXISTS vector")
     op.execute("DROP EXTENSION IF EXISTS timescaledb")

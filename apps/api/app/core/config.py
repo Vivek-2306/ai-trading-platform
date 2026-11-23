@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
     heartbeat_interval_seconds: float = Field(default=60, ge=5)
+    # Longer than the longest background task (6 h default); see celery_app.py.
+    task_visibility_timeout_seconds: int = Field(default=6 * 3600, ge=60)
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 

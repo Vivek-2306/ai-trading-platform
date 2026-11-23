@@ -14,7 +14,8 @@ def ping() -> str:
     return "pong"
 
 
-@celery_app.task(name="app.worker.tasks.heartbeat")
+# ignore_result: nothing reads it, and storing one per minute would fill the result backend.
+@celery_app.task(name="app.worker.tasks.heartbeat", ignore_result=True)
 def heartbeat() -> str:
     """Scheduled by beat; proves beat and a worker are both alive. Logs only."""
     now = datetime.now(UTC).isoformat()

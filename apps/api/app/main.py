@@ -5,7 +5,7 @@ Run locally from apps/api:
 """
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
 
 from fastapi import FastAPI
@@ -24,21 +24,26 @@ from app.core.redis import check_redis, create_redis
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Open shared clients at startup and close them at shutdown."""
+    """Open shared clients at startup and close them at shutdown.
+
+    Each client is registered for cleanup as soon as it exists, so a failure part-way
+    through startup still closes whatever was already opened.
+    """
     settings: Settings = app.state.settings
-    engine = create_engine(settings)
-    app.state.engine = engine
-    app.state.sessionmaker = create_sessionmaker(engine)
-    redis = create_redis(settings)
-    app.state.redis = redis
     timeout = settings.dependency_timeout_seconds
-    register_check(app, "database", partial(check_database, engine, timeout))
-    register_check(app, "redis", partial(check_redis, redis, timeout))
-    try:
+    async with AsyncExitStack() as cleanup:
+        engine = create_engine(settings)
+        cleanup.push_async_callback(engine.dispose)
+        app.state.engine = engine
+        app.state.sessionmaker = create_sessionmaker(engine)
+        register_check(app, "database", partial(check_database, engine, timeout))
+
+        redis = create_redis(settings)
+        cleanup.push_async_callback(redis.aclose)
+        app.state.redis = redis
+        register_check(app, "redis", partial(check_redis, redis, timeout))
+
         yield
-    finally:
-        await redis.aclose()
-        await engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

@@ -27,8 +27,15 @@ def create_celery(settings: Settings) -> Celery:
         accept_content=["json"],
         timezone="UTC",
         enable_utc=True,
-        task_acks_late=True,  # a crashed worker's task is redelivered, not lost
-        task_reject_on_worker_lost=True,
+        # Acknowledge after the task finishes, so a worker that is stopped mid-task hands
+        # the task back instead of losing it. Tasks must therefore be safe to run twice.
+        task_acks_late=True,
+        # A task that kills its worker (e.g. out of memory) is NOT redelivered: with
+        # acks_late it would otherwise crash workers in a loop. (Celery's default.)
+        task_reject_on_worker_lost=False,
+        # Redis redelivers an unacknowledged task after this many seconds. It must exceed
+        # the longest task (backtests, training), or that task runs twice in parallel.
+        broker_transport_options={"visibility_timeout": settings.task_visibility_timeout_seconds},
         worker_prefetch_multiplier=1,  # long analysis jobs: take one at a time
         result_expires=24 * 3600,
         broker_connection_retry_on_startup=True,

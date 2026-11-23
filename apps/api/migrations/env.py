@@ -6,27 +6,33 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 import app.data.models  # noqa: F401  (registers every model on Base.metadata)
 from app.core.config import get_settings
 from app.data.base import Base
 
 config = context.config
-if config.config_file_name is not None:
+# Callers that manage logging themselves (tests) set attributes["configure_logger"] = False.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# Tests may set the URL explicitly; otherwise use the app's settings.
-if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", get_settings().database_url)
-
 target_metadata = Base.metadata
+
+
+def database_url() -> str:
+    """The URL set on the Alembic config (tests do this), else the app's DATABASE_URL.
+
+    It is passed straight to SQLAlchemy and never written back into the ini config, whose
+    interpolation would choke on '%' in URL-encoded passwords.
+    """
+    return config.get_main_option("sqlalchemy.url") or get_settings().database_url
 
 
 def run_migrations_offline() -> None:
     """Emit SQL to stdout instead of connecting (alembic upgrade head --sql)."""
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=database_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -43,11 +49,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_async_engine(database_url(), poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()

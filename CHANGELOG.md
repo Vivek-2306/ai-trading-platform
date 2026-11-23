@@ -49,6 +49,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Integration tests against real TimescaleDB and Redis via testcontainers (migrations
   up/down/up, readiness healthy and unhealthy, DB session and Redis round-trips), run in CI;
   `pnpm test:integration` (AITP-17).
+- Self-review fixes: migrations accept URL-encoded passwords containing `%`; the app's
+  startup closes already-opened clients if a later step fails; Celery tasks are redelivered
+  only after a 6-hour visibility timeout (configurable) and never after crashing a worker;
+  the heartbeat stores no results; `pnpm beat` works on a fresh clone (AITP-13 … AITP-17).
 
 ### Changed (Phase 3)
 
