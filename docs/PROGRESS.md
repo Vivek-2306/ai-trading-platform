@@ -50,12 +50,14 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 
 ## In progress
 
-Phase 3 completion: self-review of the diff, then the PR into `develop`.
+Phase 3 PR #3 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/3
+CI green in 1m14s, including integration tests against real TimescaleDB + Redis.
 
 ## Next up
 
-1. Finish Phase 3, open its PR into `develop`.
-2. Owner decisions on permissions:
+1. Owner reviews and merges PR #3; then `/release-phase 3`.
+2. Phase 4 — Web app skeleton (AITP-18 … AITP-23) after the owner says "go".
+3. Owner decisions on permissions:
    - The deny rule `Bash(* .env.*)` is too broad (blocks any command that merely mentions an
      env file name, e.g. commit messages). Proposed: narrow it to reader commands.
    - `Read(**/.env.*)` also blocks *editing* the example env file. Pending addition there:
