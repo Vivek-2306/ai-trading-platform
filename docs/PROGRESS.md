@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Phase 1 — Repo foundation and workflow** on `phase-1-repo-foundation`. AITP-1 … AITP-5
-implemented; PR into `develop` being opened for owner review.
+**Phase 2 — Backend API skeleton** on `phase-2-api-skeleton` (AITP-6 … AITP-11).
+Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 
 ## Last completed
 
@@ -26,23 +26,32 @@ implemented; PR into `develop` being opened for owner review.
   AITP-3 GitHub templates (`9e2932e`), AITP-4 Claude settings + format hook (`ef0bf7c`),
   AITP-5 slash commands.
 
+- Phase 1 merged (PR #1). Branch protection on `main` and `develop` since 2026-11-23.
+- Phase 2: AITP-6 Python project in `apps/api` (uv, Python 3.13, core deps, module layout).
+- AITP-7 Ruff/mypy strict/pytest+coverage, wired into root `pnpm` scripts; format hook
+  proved working on a `.py` edit.
+- AITP-8 FastAPI `create_app()` factory, settings, `/health`, `/version`, `/docs`; 10 tests, 100% coverage of app code.
+- AITP-9 structlog (JSON in prod), X-Request-ID middleware, consistent JSON errors; 24 tests.
+- AITP-10 Dockerfile (`1423cb4`): image builds (263 MB), container answers `/health` and
+  `/version`, runs as non-root `app`, JSON logs. (Docker Desktop needed the owner's macOS
+  password once.)
+- AITP-11 CI workflow (`.github/workflows/ci.yml`, job "API (Python)"), with image smoke test.
+- Self-review fixes applied (headers on errors, no input echo, CORS wildcard rejected, 500s logged,
+  JSON-only prod logs); 34 tests.
+
 ## In progress
 
-Phase 1 PR #1 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/1
-Owner approved the self-review fixes ("yes + protect"): permissions tightened, workflow
-wording fixed, branch protection enabled on `main` and `develop`.
-Open: the deny rule `Bash(* .env.*)` is too broad (it blocks any command that merely
-mentions an env file name, e.g. commit messages). Owner to decide whether to narrow it
-to reader commands (cat/less/more/head/tail/grep/source).
+Phase 2 PR #2 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/2
+CI green (22 s). "API (Python)" is a required check on `main` and `develop` (branch must be
+up to date before merging).
 
 ## Next up
 
-1. Owner reviews and merges the Phase 1 PR; then `/release-phase 1`.
-2. Phase 2 — Backend API skeleton (AITP-6 … AITP-11) after the owner says "go".
-3. Note: `.claude/settings.json` was created mid-session; restart Claude Code (or open
-   `/hooks`) so its permissions and hook load.
-4. AITP-11 must add the CI check as a required status check on `main` and `develop`
-   (branch protection is on since 2026-11-23, without required checks because CI doesn't exist yet).
+1. Owner reviews and merges PR #2; then `/release-phase 2`.
+2. Phase 3 — Local infrastructure and data layer (AITP-12 … AITP-17) after the owner says "go".
+3. Open owner decision: the deny rule `Bash(* .env.*)` is too broad (blocks any command that
+   merely mentions an env file name, e.g. commit messages). Proposed: narrow it to reader
+   commands (cat/less/more/head/tail/grep/source).
 
 ## Open questions (owner decisions)
 

@@ -12,6 +12,8 @@ importers:
         specifier: ^2.11.13
         version: 2.11.13
 
+  apps/api: {}
+
 packages:
 
   '@turbo/darwin-64@2.11.13':
