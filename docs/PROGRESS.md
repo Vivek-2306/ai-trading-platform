@@ -44,10 +44,11 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 - AITP-13 async SQLAlchemy engine/sessions, `Base` naming conventions, `/health/ready` (verified 200 against dev DB, 503 when down); 41 tests.
 - AITP-14 Alembic + baseline migration `0001` (timescaledb, vector); upgrade/downgrade/upgrade verified on dev DB and from the image; 44 tests.
 - AITP-15 async Redis client + readiness check (live: 200 → 503 when Redis stopped → 200); 46 tests.
+- AITP-16 Celery app + `ping`/`heartbeat` tasks, beat schedule; live round-trip through Redis verified; 51 tests.
 
 ## In progress
 
-Phase 3 tickets, in order AITP-16 … AITP-17.
+Phase 3: AITP-17 (integration tests), then the phase PR.
 
 ## Next up
 

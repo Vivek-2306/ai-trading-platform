@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     database_pool_size: int = Field(default=5, ge=1, le=50)
     # Cache, live prices and pub/sub (the Celery broker uses CELERY_BROKER_URL).
     redis_url: str = "redis://localhost:6379/0"
+
+    # Background jobs. Separate Redis databases keep queues, results and cache apart.
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+    heartbeat_interval_seconds: float = Field(default=60, ge=5)
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 

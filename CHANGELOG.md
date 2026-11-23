@@ -44,6 +44,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   TimescaleDB and pgvector; `pnpm db:migrate`; migrations ship in the Docker image (AITP-14).
 - Async Redis client created at startup and closed at shutdown; `/health/ready` reports
   database and Redis separately (AITP-15).
+- Celery worker and beat on Redis (JSON-only, acks-late, one task at a time, UTC, structlog
+  logging) with a `ping` task and a minutely `heartbeat`; `pnpm worker` / `pnpm beat` (AITP-16).
 
 ### Changed
 

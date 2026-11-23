@@ -18,7 +18,9 @@
     "infra:down": "docker compose --project-directory . -f infra/docker-compose.dev.yml down",
     "infra:logs": "docker compose --project-directory . -f infra/docker-compose.dev.yml logs -f",
     "infra:ps": "docker compose --project-directory . -f infra/docker-compose.dev.yml ps",
-    "db:migrate": "pnpm --filter @aitp/api db:migrate"
+    "db:migrate": "pnpm --filter @aitp/api db:migrate",
+    "worker": "pnpm --filter @aitp/api worker",
+    "beat": "pnpm --filter @aitp/api beat"
   },
   "devDependencies": {
     "turbo": "^2.11.13"
