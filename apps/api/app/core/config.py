@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # Set by CI / the Docker build so /version can report exactly what is running.
     git_sha: str | None = None
 
+    # Dev default matches infra/docker-compose.dev.yml; production always sets DATABASE_URL.
+    database_url: str = "postgresql+asyncpg://trading:trading_dev@localhost:5432/trading"
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    # Seconds a readiness check may wait for a dependency before calling it unavailable.
+    dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

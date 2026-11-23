@@ -37,6 +37,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dev Compose stack finalised: Postgres 17 + TimescaleDB + pgvector and Redis 7 with
   healthchecks, named volumes, localhost-only ports and env-driven credentials;
   `pnpm infra:up/down/logs/ps` (AITP-12).
+- Async database layer: SQLAlchemy 2 + asyncpg engine created at startup and disposed at
+  shutdown, a per-request session dependency, a declarative base with constraint naming
+  conventions, and `GET /health/ready` (503 when a dependency is down) (AITP-13).
 
 ### Changed
 
