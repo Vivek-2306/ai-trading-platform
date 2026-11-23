@@ -30,10 +30,11 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 - Phase 2: AITP-6 Python project in `apps/api` (uv, Python 3.13, core deps, module layout).
 - AITP-7 Ruff/mypy strict/pytest+coverage, wired into root `pnpm` scripts; format hook
   proved working on a `.py` edit.
+- AITP-8 FastAPI `create_app()` factory, settings, `/health`, `/version`, `/docs`; 10 tests, 100% coverage of app code.
 
 ## In progress
 
-Phase 2 tickets, in order AITP-8 … AITP-11.
+Phase 2 tickets, in order AITP-9 … AITP-11.
 
 ## Next up
 

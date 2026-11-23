@@ -3,6 +3,7 @@
   "private": true,
   "description": "Runs the Python backend's checks from the pnpm/Turborepo workspace",
   "scripts": {
+    "dev": "uv run uvicorn app.main:create_app --factory --reload --port 8000",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "format": "uv run ruff format . && uv run ruff check --fix .",
     "typecheck": "uv run mypy",

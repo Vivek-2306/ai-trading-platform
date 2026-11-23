@@ -22,6 +22,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   module layout for api, core, data, analysis, signals, risk, execution, backtest (AITP-6).
 - Python tooling: Ruff (lint + format), mypy strict, pytest with coverage; `pnpm lint`,
   `typecheck`, `test` and `format` now include the backend (AITP-7).
+- FastAPI app factory with typed settings from the environment, `GET /health`,
+  `GET /version`, OpenAPI at `/docs`; `pnpm dev` runs the API (AITP-8).
 
 ### Changed
 

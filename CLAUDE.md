@@ -76,7 +76,8 @@ Python backend included (`apps/api/package.json` wraps the uv commands).
 | Lint | `pnpm lint` | `uv run ruff check . && uv run ruff format --check .` |
 | Format | `pnpm format` | `uv run ruff format . && uv run ruff check --fix .` |
 | Typecheck | `pnpm typecheck` | `uv run mypy` (strict) |
-| Test | `pnpm test` | `uv run pytest` (coverage printed) |
+| Test | `pnpm test` | `uv run pytest` (coverage printed; warnings fail) |
+| Run API | `pnpm dev` | `uv run uvicorn app.main:create_app --factory --reload` → http://localhost:8000/docs |
 
 Python config lives in `apps/api/pyproject.toml` (Ruff rules, mypy strict + pydantic plugin,
 pytest with `asyncio_mode = auto`, `integration` marker for tests needing Docker).

@@ -19,6 +19,7 @@ package = false
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.2",
     "mypy>=2.4.1",
     "pytest>=9.2.0",
     "pytest-asyncio>=1.5.0",
@@ -48,6 +49,8 @@ files = ["app", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
 addopts = "--strict-markers --cov=app --cov-report=term-missing"
 markers = [
     "integration: needs real Postgres/Redis (Docker); skipped unless selected",
