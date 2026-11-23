@@ -1,0 +1,23 @@
+# Local dev: database + Redis only. API and web run natively.
+services:
+  db:
+    image: timescale/timescaledb-ha:pg17 # Postgres + TimescaleDB + pgvector in one image
+    environment:
+      POSTGRES_USER: trading
+      POSTGRES_PASSWORD: trading_dev # dev-only password; never reuse
+      POSTGRES_DB: trading
+    ports: [ "5432:5432" ]
+    volumes: [ db-data:/home/postgres/pgdata ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U trading" ]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: [ "6379:6379" ]
+    volumes: [ redis-data:/data ]
+
+volumes:
+  db-data:
+  redis-data:

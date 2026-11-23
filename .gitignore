@@ -1,0 +1,42 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+**/secrets/
+private/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+mlruns/
+
+# Node / Next.js / Expo
+node_modules/
+.next/
+out/
+.turbo/
+.expo/
+*.tsbuildinfo
+dist/
+build/
+
+# Data and model files (too large for git)
+data/
+*.parquet
+*.pkl
+*.joblib
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Local Claude Code settings (shared settings.json IS committed)
+.claude/settings.local.json
