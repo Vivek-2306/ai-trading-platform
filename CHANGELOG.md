@@ -17,13 +17,14 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Planning docs, ADRs 0001–0002 and the local dev Compose file (project setup).
 - Branch protection on `main` and `develop`: PR required, no force pushes or deletions,
   admins included, conversations must be resolved (part of AITP-34, done early).
-
 - Python backend project in `apps/api`: uv, Python 3.13, FastAPI/Uvicorn/Pydantic/structlog/httpx,
   module layout for api, core, data, analysis, signals, risk, execution, backtest (AITP-6).
 - Python tooling: Ruff (lint + format), mypy strict, pytest with coverage; `pnpm lint`,
   `typecheck`, `test` and `format` now include the backend (AITP-7).
 - FastAPI app factory with typed settings from the environment, `GET /health`,
   `GET /version`, OpenAPI at `/docs`; `pnpm dev` runs the API (AITP-8).
+- Structured logging (JSON in production, readable in dev), an `X-Request-ID` on every
+  request, response and log line, and one JSON error format with no stack traces (AITP-9).
 
 ### Changed
 

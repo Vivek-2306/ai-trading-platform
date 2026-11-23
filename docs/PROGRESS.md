@@ -31,10 +31,11 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 - AITP-7 Ruff/mypy strict/pytest+coverage, wired into root `pnpm` scripts; format hook
   proved working on a `.py` edit.
 - AITP-8 FastAPI `create_app()` factory, settings, `/health`, `/version`, `/docs`; 10 tests, 100% coverage of app code.
+- AITP-9 structlog (JSON in prod), X-Request-ID middleware, consistent JSON errors; 24 tests.
 
 ## In progress
 
-Phase 2 tickets, in order AITP-9 … AITP-11.
+Phase 2 tickets, in order AITP-10 … AITP-11.
 
 ## Next up
 
