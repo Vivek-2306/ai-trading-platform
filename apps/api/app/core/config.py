@@ -7,15 +7,25 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-# apps/api/app/core/config.py -> repo root is four levels up.
-REPO_ROOT = Path(__file__).resolve().parents[4]
+
+def _find_repo_root(start: Path) -> Path | None:
+    """The monorepo root (has pnpm-workspace.yaml), or None when running outside it (Docker)."""
+    for folder in start.parents:
+        if (folder / "pnpm-workspace.yaml").is_file():
+            return folder
+    return None
+
+
+REPO_ROOT = _find_repo_root(Path(__file__).resolve())
+# In the repo, load the root env file for local dev; in a container, env vars only.
+ENV_FILE = REPO_ROOT / ".env" if REPO_ROOT else None
 
 
 class Settings(BaseSettings):
     """Typed settings. Every field maps to an upper-case environment variable."""
 
     model_config = SettingsConfigDict(
-        env_file=REPO_ROOT / ".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )

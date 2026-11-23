@@ -25,6 +25,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `GET /version`, OpenAPI at `/docs`; `pnpm dev` runs the API (AITP-8).
 - Structured logging (JSON in production, readable in dev), an `X-Request-ID` on every
   request, response and log line, and one JSON error format with no stack traces (AITP-9).
+- API Dockerfile: multi-stage uv build, slim non-root runtime, healthcheck on `/health`,
+  `GIT_SHA` build arg; settings no longer assume the monorepo layout at runtime (AITP-10).
 
 ### Changed
 

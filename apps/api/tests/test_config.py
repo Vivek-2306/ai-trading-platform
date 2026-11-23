@@ -1,5 +1,7 @@
 """Tests for settings loading."""
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -37,6 +39,20 @@ def test_cors_origins_accept_comma_separated_string(monkeypatch: pytest.MonkeyPa
 def test_rejects_unknown_trading_mode() -> None:
     with pytest.raises(ValidationError):
         Settings(_env_file=None, trading_mode="yolo")
+
+
+def test_repo_root_found_in_monorepo() -> None:
+    from app.core.config import REPO_ROOT
+
+    assert REPO_ROOT is not None
+    assert (REPO_ROOT / "pnpm-workspace.yaml").is_file()
+
+
+def test_repo_root_is_none_outside_monorepo(tmp_path: Path) -> None:
+    from app.core.config import _find_repo_root
+
+    nested = tmp_path / "app" / "app" / "core" / "config.py"
+    assert _find_repo_root(nested) is None
 
 
 def test_get_settings_is_cached() -> None:

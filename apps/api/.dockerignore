@@ -1,0 +1,19 @@
+# Keep the build context small and secret-free.
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+data/
+node_modules/
+package.json
+Dockerfile
+.dockerignore
+# Never ship env files or secrets
+.env
+.env.*
+**/secrets/
