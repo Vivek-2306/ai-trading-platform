@@ -41,13 +41,14 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 
 ## In progress
 
-Phase 2 completion: self-review of the diff, then the PR into `develop`, CI, and making
-"API (Python)" a required check on `main` and `develop`.
+Phase 2 PR #2 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/2
+CI green (22 s). "API (Python)" is a required check on `main` and `develop` (branch must be
+up to date before merging).
 
 ## Next up
 
-1. Finish Phase 2, open its PR into `develop`.
-2. AITP-11 must add the CI check as a required status check on `main` and `develop`.
+1. Owner reviews and merges PR #2; then `/release-phase 2`.
+2. Phase 3 — Local infrastructure and data layer (AITP-12 … AITP-17) after the owner says "go".
 3. Open owner decision: the deny rule `Bash(* .env.*)` is too broad (blocks any command that
    merely mentions an env file name, e.g. commit messages). Proposed: narrow it to reader
    commands (cat/less/more/head/tail/grep/source).
