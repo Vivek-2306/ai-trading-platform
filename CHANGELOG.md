@@ -18,6 +18,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Branch protection on `main` and `develop`: PR required, no force pushes or deletions,
   admins included, conversations must be resolved (part of AITP-34, done early).
 
+- Python backend project in `apps/api`: uv, Python 3.13, FastAPI/Uvicorn/Pydantic/structlog/httpx,
+  module layout for api, core, data, analysis, signals, risk, execution, backtest (AITP-6).
+
 ### Changed
 
 - Tightened Claude Code permissions after self-review: pushes allowed only to `phase-*`

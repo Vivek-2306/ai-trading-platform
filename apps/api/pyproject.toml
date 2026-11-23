@@ -1,0 +1,18 @@
+[project]
+name = "trading-api"
+version = "0.1.0"
+description = "AI Trading Platform backend: API, workers and engines"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.165.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.14.4",
+    "pydantic-settings>=2.16.3",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+# Application, not a library: run from this folder, no wheel build.
+package = false
