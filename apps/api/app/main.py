@@ -19,6 +19,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import check_database, create_engine, create_sessionmaker
 from app.core.logging import configure_logging
 from app.core.readiness import register_check
+from app.core.redis import check_redis, create_redis
 
 
 @asynccontextmanager
@@ -28,12 +29,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.sessionmaker = create_sessionmaker(engine)
-    register_check(
-        app, "database", partial(check_database, engine, settings.dependency_timeout_seconds)
-    )
+    redis = create_redis(settings)
+    app.state.redis = redis
+    timeout = settings.dependency_timeout_seconds
+    register_check(app, "database", partial(check_database, engine, timeout))
+    register_check(app, "redis", partial(check_redis, redis, timeout))
     try:
         yield
     finally:
+        await redis.aclose()
         await engine.dispose()
 
 

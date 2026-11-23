@@ -42,6 +42,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   conventions, and `GET /health/ready` (503 when a dependency is down) (AITP-13).
 - Alembic migrations (async, URL from settings, dated file names) with a baseline that enables
   TimescaleDB and pgvector; `pnpm db:migrate`; migrations ship in the Docker image (AITP-14).
+- Async Redis client created at startup and closed at shutdown; `/health/ready` reports
+  database and Redis separately (AITP-15).
 
 ### Changed
 

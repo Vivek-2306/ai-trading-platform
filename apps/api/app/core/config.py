@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     # Dev default matches infra/docker-compose.dev.yml; production always sets DATABASE_URL.
     database_url: str = "postgresql+asyncpg://trading:trading_dev@localhost:5432/trading"
     database_pool_size: int = Field(default=5, ge=1, le=50)
+    # Cache, live prices and pub/sub (the Celery broker uses CELERY_BROKER_URL).
+    redis_url: str = "redis://localhost:6379/0"
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 
