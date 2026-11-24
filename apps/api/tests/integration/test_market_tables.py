@@ -1578,3 +1578,217 @@ def test_signals_api_reads_the_kill_switch_live_and_a_legacy_buy_does_not_block_
 
     assert asyncio.run(old_buy_then_migrate()) == "inserted"
     command.upgrade(config, "head")  # must not fail on the old BUY
+
+
+def _seed_walk(postgres_url: str, symbol: str, n: int = 1500, seed: int = 21) -> tuple[int, object]:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(seed)
+    start = datetime(2024, 1, 1, tzinfo=UTC)
+    spec = InstrumentSpec("binance", symbol, AssetClass.CRYPTO)
+
+    async def seed_rows(session: AsyncSession) -> int:
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        price = 100.0
+        rows = []
+        for i in range(n):
+            price *= 1 + rng.normal(0.0001, 0.012)
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    return _run(postgres_url, seed_rows), spec
+
+
+def test_backtests_are_stored_append_only_and_repeatable(postgres_url: str) -> None:
+    from sqlalchemy.exc import DBAPIError
+
+    from app.backtest.engine import BacktestConfig
+    from app.backtest.runner import rerun, run_and_store
+
+    _, spec = _seed_walk(postgres_url, "BTEST/USDT")
+    config = BacktestConfig("BTEST/USDT", "1h", capital=Decimal("1000"))
+
+    async def work(session: AsyncSession) -> dict[str, Any]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        out: dict[str, Any] = {}
+        runs = await run_and_store(sessions, spec, config)  # type: ignore[arg-type]
+        out["segments"] = [r.segment for r in runs]
+        tuning = next(r for r in runs if r.segment == "tuning")
+        wf = next(r for r in runs if r.segment == "walk_forward")
+        out["tuning_metrics"] = tuning.metrics
+        out["wf_metrics"] = wf.metrics
+        out["rerun"] = await rerun(sessions, tuning.id)
+        row = (
+            await session.execute(
+                text(
+                    "SELECT config_hash, candle_count, length(data_fingerprint) AS fp, "
+                    "jsonb_typeof(trades) AS tt, jsonb_array_length(equity -> 'times') AS pts, "
+                    "benchmark ->> 'verdict' AS verdict FROM backtest_runs WHERE id = :i"
+                ),
+                {"i": tuning.id},
+            )
+        ).one()
+        out["row"] = (row.config_hash, row.candle_count, row.fp, row.tt, row.pts, row.verdict)
+        for name, statement in (
+            ("update", "UPDATE backtest_runs SET strategy = 'x'"),
+            ("delete", "DELETE FROM backtest_runs"),
+        ):
+            try:
+                await session.execute(text(statement))
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "append-only" if "append-only" in str(exc) else str(exc)
+        return out
+
+    out = _run(postgres_url, work)
+    assert out["segments"] == ["tuning", "walk_forward"]  # the locked period is not touched
+    assert out["tuning_metrics"]["trades"] >= 0 and "max_drawdown_pct" in out["tuning_metrics"]
+    assert out["wf_metrics"]["windows"] >= 1
+    assert out["rerun"].identical is True, out["rerun"].reasons
+    config_hash, candle_count, fp, trades_type, points, verdict = out["row"]
+    assert config_hash == config.config_hash() and fp == 64 and trades_type == "array"
+    assert 2 <= points <= 401 and candle_count > 1000 and "buy-and-hold" in verdict
+    assert out["update"] == out["delete"] == "append-only"
+
+
+def test_the_locked_period_is_judged_once_and_the_database_enforces_it(
+    postgres_url: str,
+) -> None:
+    from sqlalchemy.exc import DBAPIError
+
+    from app.backtest.engine import BacktestConfig
+    from app.backtest.runner import run_and_store
+    from app.backtest.splits import OosLockedError
+
+    _, spec = _seed_walk(postgres_url, "OOSTEST/USDT", seed=33)
+    first = BacktestConfig("OOSTEST/USDT", "1h")
+    second = BacktestConfig("OOSTEST/USDT", "1h", fee_pct=Decimal("0.05"))
+
+    async def work(session: AsyncSession) -> dict[str, Any]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        out: dict[str, Any] = {}
+        runs = await run_and_store(sessions, spec, first, judge_oos_period=True)  # type: ignore[arg-type]
+        out["segments"] = [r.segment for r in runs]
+        again = await run_and_store(sessions, spec, first, judge_oos_period=True)  # type: ignore[arg-type]
+        out["again"] = [r.segment for r in again]  # the same configuration may re-judge
+        before = (
+            await session.execute(text("SELECT count(*) FROM backtest_runs WHERE segment = 'oos'"))
+        ).scalar_one()
+        try:
+            await run_and_store(sessions, spec, second, judge_oos_period=True)  # type: ignore[arg-type]
+            out["second"] = "accepted"
+        except OosLockedError as exc:
+            out["second"] = "refused"
+            out["message"] = str(exc)
+        after = (
+            await session.execute(text("SELECT count(*) FROM backtest_runs WHERE segment = 'oos'"))
+        ).scalar_one()
+        out["oos_runs_unchanged"] = before == after
+        # Tuning the second configuration without touching the locked period is still allowed.
+        tuned = await run_and_store(sessions, spec, second)  # type: ignore[arg-type]
+        out["tuning_ok"] = [r.segment for r in tuned]
+        # And the database itself refuses to change or erase the lock.
+        for name, statement in (
+            ("overwrite", "UPDATE oos_locks SET config_hash = 'zzz' WHERE symbol = 'OOSTEST/USDT'"),
+            ("move", "UPDATE oos_locks SET oos_start = now() WHERE symbol = 'OOSTEST/USDT'"),
+            ("delete", "DELETE FROM oos_locks WHERE symbol = 'OOSTEST/USDT'"),
+        ):
+            try:
+                await session.execute(text(statement))
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "refused" if "append-only" in str(exc) else str(exc)
+        out["lock"] = (
+            await session.execute(
+                text("SELECT config_hash FROM oos_locks WHERE symbol = 'OOSTEST/USDT'")
+            )
+        ).scalar_one()
+        return out
+
+    out = _run(postgres_url, work)
+    assert out["segments"] == ["tuning", "walk_forward", "oos"]
+    assert out["again"] == ["tuning", "walk_forward", "oos"]
+    assert out["second"] == "refused" and first.config_hash() in out["message"]
+    assert out["oos_runs_unchanged"] is True  # the refused attempt stored nothing
+    assert out["tuning_ok"] == ["tuning", "walk_forward"]
+    assert out["overwrite"] == out["move"] == out["delete"] == "refused"
+    assert out["lock"] == first.config_hash()
+
+
+def test_the_cli_and_the_celery_task_run_backtests(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import argparse
+
+    from app.backtest import __main__ as cli
+    from app.core.config import Settings
+    from app.worker import tasks
+
+    _seed_walk(postgres_url, "CLITEST/USDT", seed=44)
+    settings = Settings(_env_file=None, database_url=postgres_url)
+    monkeypatch.setattr("app.backtest.__main__.get_settings", lambda: settings)
+    monkeypatch.setattr(tasks, "get_settings", lambda: settings)
+    monkeypatch.setattr("app.backtest.runner.get_settings", lambda: settings)
+
+    args = argparse.Namespace(
+        command="run",
+        symbol="CLITEST/USDT",
+        timeframe="1h",
+        capital="1000",
+        fee_pct="0.1",
+        slippage_bps="5",
+        latency=0,
+        judge_oos=False,
+    )
+    assert asyncio.run(cli._main(args)) == 0
+    printed = capsys.readouterr().out
+    assert "[tuning]" in printed and "[walk_forward]" in printed
+
+    again = asyncio.run(
+        cli._main(argparse.Namespace(command="rerun", run_id=_latest_run(postgres_url)))
+    )
+    assert again == 0  # identical
+    assert "identical" in capsys.readouterr().out
+
+    runs = tasks.run_backtest_task.apply(args=("CLITEST/USDT", "1h", {"fee_pct": "0.2"})).get()
+    assert [r["segment"] for r in runs] == ["tuning", "walk_forward"]  # never the locked period
+
+
+def _latest_run(url: str) -> int:
+    async def get(session: AsyncSession) -> int:
+        return int(
+            (
+                await session.execute(
+                    text(
+                        "SELECT id FROM backtest_runs WHERE segment = 'tuning' "
+                        "ORDER BY id DESC LIMIT 1"
+                    )
+                )
+            ).scalar_one()
+        )
+
+    return _run(url, get)

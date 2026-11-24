@@ -20,6 +20,7 @@ from app.backtest.engine import (
     run_backtest,
 )
 from app.backtest.splits import Splits, Window, candles_for, walk_forward_windows
+from app.data.adapters.base import RawCandle
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,14 +54,16 @@ def run_on_tuning(
     return run_backtest(splits.tuning, config, strategy)
 
 
+def oos_feed(splits: Splits, config: BacktestConfig) -> list[RawCandle]:
+    """The candles to judge ONE configuration on the locked period (refused if another one
+    already was). The indicators need history before the first locked candle; that comes from
+    the end of the tuning region (earlier data, so nothing leaks backwards)."""
+    locked = splits.oos.unlock(config.config_hash())
+    return splits.tuning[-MIN_CANDLES:] + locked
+
+
 def judge_oos(
     splits: Splits, config: BacktestConfig, strategy: Strategy = default_strategy
 ) -> BacktestResult:
-    """Judge ONE configuration on the locked period. Refused if another one already was.
-
-    The indicators need history before the first locked candle; that comes from the end of the
-    tuning region (earlier data, so nothing leaks backwards).
-    """
-    locked = splits.oos.unlock(config.config_hash())
-    feed = splits.tuning[-MIN_CANDLES:] + locked
-    return run_backtest(feed, config, strategy)
+    """Judge ONE configuration on the locked period."""
+    return run_backtest(oos_feed(splits, config), config, strategy)
