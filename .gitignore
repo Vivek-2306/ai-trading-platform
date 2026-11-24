@@ -27,7 +27,8 @@ dist/
 build/
 
 # Data and model files (too large for git)
-data/
+/data/
+apps/api/data/
 *.parquet
 *.pkl
 *.joblib
@@ -40,3 +41,6 @@ data/
 
 # Local Claude Code settings (shared settings.json IS committed)
 .claude/settings.local.json
+
+# Production stack settings (real values)
+infra/prod.env

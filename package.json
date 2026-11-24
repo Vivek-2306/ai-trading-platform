@@ -1,0 +1,38 @@
+{
+  "name": "ai-trading-platform",
+  "private": true,
+  "description": "AI-powered trading research and signal platform (monorepo root)",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "turbo run format",
+    "build": "turbo run build",
+    "bootstrap": "pnpm install && cd apps/api && uv sync --all-groups && cd ../.. && pnpm hooks:install",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "stack:up": "docker compose --env-file infra/prod.env -f infra/docker-compose.prod.yml up -d --build",
+    "stack:down": "docker compose --env-file infra/prod.env -f infra/docker-compose.prod.yml down",
+    "infra:up": "docker compose --project-directory . -f infra/docker-compose.dev.yml up -d --wait",
+    "infra:down": "docker compose --project-directory . -f infra/docker-compose.dev.yml down",
+    "infra:logs": "docker compose --project-directory . -f infra/docker-compose.dev.yml logs -f",
+    "infra:ps": "docker compose --project-directory . -f infra/docker-compose.dev.yml ps",
+    "db:migrate": "pnpm --filter @aitp/api db:migrate",
+    "worker": "pnpm --filter @aitp/api worker",
+    "beat": "pnpm --filter @aitp/api beat",
+    "test:integration": "pnpm --filter @aitp/api test:integration",
+    "tunnel": "bash scripts/tunnel.sh",
+    "api:postman": "pnpm --filter @aitp/api postman",
+    "hooks:install": "cd apps/api && uv run pre-commit install --config ../../.pre-commit-config.yaml",
+    "hooks:run": "cd apps/api && uv run pre-commit run --all-files --config ../../.pre-commit-config.yaml"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "turbo": "^2.11.13"
+  }
+}

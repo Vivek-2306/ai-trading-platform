@@ -55,6 +55,7 @@ Ticket properties: Title, ID, Status (To Do, In Progress, Blocked, Needs Decisio
 Done), Phase, Phase page (relation to Phases DB), Type, Priority, Branch, Commit, PR,
 Locked by (laptop, cloud). Acceptance criteria = to-do checklist in the ticket body; tick
 each item when it's met. Phase rows track Status, Branch, PR and Release tag.
+| Notion API Reference | https://app.notion.com/p/422426f94e2f8123b0d0e0188c8fc245 — data source `collection://422426f9-4e2f-818b-8ccd-000b0ed567a4` (one row per endpoint; Postman copy in `docs/api/`) |
 | Plan review doc | https://claude.ai/artifact/XRbXnA3USEdg7H7sZFfYgR (the `docs/` files are the source of truth) |
 
 ## Stack (approved 2026-11-23 — see docs/TECH_STACK.md, ADR 0001)
@@ -67,14 +68,26 @@ each item when it's met. Phase rows track Status, Branch, PR and Release tag.
 
 ## Commands
 
-Not scaffolded yet (setup Step 2). Planned — replace with the real ones once they work:
+From the repo root, `pnpm <task>` runs every package's task through Turborepo, the
+Python backend included (`apps/api/package.json` wraps the uv commands).
 
-| Task | Python (`apps/api`) | TypeScript (root) |
+| Task | Everything (root) | Python only (in `apps/api`) |
 | --- | --- | --- |
-| Install | `uv sync` | `pnpm install` |
-| Lint | `uv run ruff check . && uv run ruff format --check .` | `pnpm lint` |
-| Typecheck | `uv run mypy .` | `pnpm typecheck` |
-| Test | `uv run pytest` | `pnpm test` |
+| Install | `pnpm install` + `uv sync --all-groups` (in `apps/api`) | `uv sync --all-groups` (all packages; plain `uv sync` = dev tools only). macOS also needs `brew install libomp` for LightGBM |
+| Lint | `pnpm lint` | `uv run ruff check . && uv run ruff format --check .` |
+| Format | `pnpm format` | `uv run ruff format . && uv run ruff check --fix .` |
+| Typecheck | `pnpm typecheck` | `uv run mypy` (strict) |
+| Test | `pnpm test` | `uv run pytest` (unit; coverage printed; warnings fail) |
+| Integration tests | `pnpm test:integration` | `uv run pytest -m integration` (needs Docker; starts its own TimescaleDB + Redis) |
+| Dev DB + Redis | `pnpm infra:up` / `infra:down` / `infra:logs` / `infra:ps` | Postgres 17 + TimescaleDB + pgvector on 127.0.0.1:5432, Redis on :6379 |
+| Migrate DB | `pnpm db:migrate` | `uv run alembic upgrade head` · `downgrade -1` · `revision --autogenerate -m "..."` (import new models in `app/data/models/__init__.py`) |
+| Workers | `pnpm worker` / `pnpm beat` | `uv run celery -A app.worker.celery_app worker` / `beat` (needs `pnpm infra:up`) |
+| Web app | `pnpm --filter @aitp/web dev` | http://localhost:3000 (needs the API running; `/api/*` is proxied to it) |
+| Phone/tablet preview | `pnpm tunnel` | Builds the web app, opens an ngrok URL, prints it. Needs the API running and ngrok signed in. |
+| Run API | `pnpm dev` | `uv run uvicorn app.main:create_app --factory --reload` → http://localhost:8000/docs |
+
+Python config lives in `apps/api/pyproject.toml` (Ruff rules, mypy strict + pydantic plugin,
+pytest with `asyncio_mode = auto`; tests marked `integration` are skipped unless `-m integration`).
 
 ## Workflow rules
 
@@ -90,16 +103,25 @@ Not scaffolded yet (setup Step 2). Planned — replace with the real ones once t
    ticket, tick its acceptance criteria, Status = Done, clear Locked by.
 5. After 2 failed attempts or any unclear requirement: comment on the ticket, set Blocked or
    Needs Decision, move to the next ticket.
-6. After each ticket: update `docs/PROGRESS.md` (done, next, open questions, session log).
+6. After each ticket: update `docs/PROGRESS.md` (done, next, open questions, session log) and
+   the CHANGELOG.md Unreleased section, in that ticket's commit.
 7. Big technical choices → new ADR in `docs/decisions/`.
 8. Scope changes: update `docs/PLAN.md` first, then Notion. PLAN.md = source of truth for
    scope; Notion = source of truth for status.
-9. Phase completion: all tickets Done → rebase on latest `develop` → full checks → self-review the
-   whole diff with a fresh subagent and fix issues → push → `gh pr create` with the PR
-   template → tickets to In Review with PR URL → CHANGELOG.md (Unreleased) → give owner the link.
+9. Phase completion: all tickets Done → merge the latest `origin/develop` into the phase
+   branch (never rebase a pushed branch; that would need a force push) → full checks →
+   self-review the whole diff with a fresh subagent and fix issues → push → `gh pr create
+   --base develop` with the PR template → tickets and phase row to In Review with PR URL →
+   give owner the link.
 10. Wait for CI to pass; if it fails, fix it before saying the PR is ready.
-11. NEVER merge PRs, force-push, or push to `main` or `develop` directly. Never read `.env` files or use
-    production credentials. No live-trading code path may bypass the risk engine.
+11. NEVER merge PRs, force-push, or push to `main` or `develop` directly (GitHub branch
+    protection also blocks it). Never read `.env` files or use production credentials; read
+    `.env.example` with `git show HEAD:.env.example`. No live-trading code path may bypass
+    the risk engine.
+
+12. API changes: whenever an endpoint is added or changed, in the same ticket run `pnpm api:postman`
+    (regenerates `docs/api/`), regenerate the web client (`pnpm --filter @aitp/api-client generate`),
+    and add or update its row in the Notion "API Reference" database.
 
 Phase size: 5–8 tickets, roughly ≤600 changed lines per PR; split bigger phases (3a/3b).
 

@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/.venv
+**/.turbo
+.git
+private
+**/.env
+**/.env.*
+!**/.env.example
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+apps/api/data
+infra/*.env
+**/*.env
+**/secrets/

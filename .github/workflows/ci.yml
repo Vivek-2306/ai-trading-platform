@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+# One run per branch/PR; a new push cancels the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: Install Python and dependencies
+        run: uv sync --locked
+
+      - name: Lint (Ruff)
+        run: |
+          uv run ruff check . --output-format=github
+          uv run ruff format --check .
+
+      - name: Type-check (mypy strict)
+        run: uv run mypy
+
+      - name: Unit tests (pytest)
+        run: uv run pytest
+
+      - name: Integration tests (real TimescaleDB + Redis via testcontainers)
+        run: uv run pytest -m integration --cov-append
+
+      - name: Postman collection is up to date
+        run: |
+          PYTHONPATH=. uv run python scripts/export_postman.py ../../docs/api
+          git add -N ../../docs/api
+          git diff --exit-code -- ../../docs/api
+
+      - name: Build Docker image
+        run: docker build --build-arg GIT_SHA=${GITHUB_SHA::7} -t aitp-api:ci .
+
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name api-smoke -p 8000:8000 aitp-api:ci
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          echo "API container did not become healthy"; docker logs api-smoke; exit 1
+
+  web:
+    name: Web (TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (Biome)
+        run: pnpm --filter @aitp/web lint
+
+      - name: Type-check
+        run: pnpm --filter @aitp/web --filter @aitp/api-client typecheck
+
+      - name: Unit tests (Vitest)
+        run: pnpm --filter @aitp/web test
+
+      - name: Build
+        run: pnpm --filter @aitp/web build
+
+      - name: Build web Docker image
+        run: docker build -f apps/web/Dockerfile -t aitp-web:ci .
+
+      - name: Production Compose file is valid
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/docker-compose.prod.yml config -q
+
+      # The generated client must match the API. Needs Python, to read the API's schema.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: API client is up to date
+        run: |
+          (cd apps/api && uv sync --locked)
+          pnpm --filter @aitp/api-client check:fresh
+
+  packages:
+    name: Packages (import smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: Install every dependency group
+        run: uv sync --locked --all-groups
+
+      # A missing or broken package fails here instead of being skipped.
+      - name: Import smoke tests
+        run: |
+          uv run pytest tests/test_packages.py --no-cov -q | tee smoke.txt
+          # Nothing may be skipped: a skip here would hide a missing package.
+          if grep -q skipped smoke.txt; then echo "tests were skipped"; exit 1; fi
+        env:
+          REQUIRE_ALL_PACKAGES: "1"
+          MLFLOW_DISABLE_TELEMETRY: "true"
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # scan the full history, not just the latest commit
+
+      # Pinned release, verified against its published checksum.
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+
+      - name: Scan history for secrets
+        run: ./gitleaks detect --redact --no-banner --verbose

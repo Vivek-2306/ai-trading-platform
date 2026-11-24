@@ -1,0 +1,110 @@
+[project]
+name = "trading-api"
+version = "0.1.0"
+description = "AI Trading Platform backend: API, workers and engines"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
+    "celery[redis]>=5.7.0",
+    "fastapi>=0.165.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.14.4",
+    "pydantic-settings>=2.16.3",
+    "redis>=8.2.0",
+    "sentry-sdk>=3.0.0",
+    "sqlalchemy[asyncio]>=2.1.9",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+# Application, not a library: run from this folder, no wheel build.
+package = false
+
+[dependency-groups]
+ai = [
+    "anthropic>=2.13.0",
+    "pgvector>=0.5.1",
+    "voyageai>=0.6.0",
+]
+analysis = [
+    "exchange-calendars>=4.13.3",
+    "numpy>=2.5.5",
+    "pandas>=3.1.1",
+    "polars>=2.1.0",
+    "quantstats>=0.0.86",
+    "scipy>=1.18.1",
+    "statsmodels>=0.15.0",
+    "ta-lib>=0.8.3.post1",
+    "vectorbt>=1.2.1",
+]
+dev = [
+    "celery-types>=0.26.0",
+    "httpx2>=2.16.2",
+    "mypy>=2.4.1",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.6",
+    "testcontainers[postgres,redis]>=4.15.0",
+]
+markets = [
+    "alpaca-py>=0.45.0",
+    "ccxt>=4.5.94",
+    "feedparser>=6.0.14",
+    "finnhub-python>=2.4.30",
+    "fredapi>=0.5.2",
+    "kiteconnect>=5.2.2",
+    "polygon-api-client>=0.2.11",
+    "pysocks>=1.7.1",
+    "python-telegram-bot>=22.8",
+    "tenacity>=9.2.1",
+    "trafilatura>=2.1.0",
+    "websockets>=17.4",
+]
+ml = [
+    "lightgbm>=4.7.0",
+    "mlflow-skinny>=3.18.0",
+    "optuna>=5.1.0",
+    "scikit-learn>=1.9.1",
+    "shap>=0.54.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# E/W/F pycodestyle+pyflakes, I isort, B bugbear, UP pyupgrade, SIM simplify, RUF ruff,
+# ASYNC async pitfalls, N naming, DTZ timezone-aware datetimes (prices are time series),
+# T20 no print() — use the logger.
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "ASYNC", "N", "DTZ", "T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+addopts = "--strict-markers -m \"not integration\" --cov=app --cov-report=term-missing"
+markers = [
+    "integration: needs real Postgres/Redis (Docker); skipped unless selected",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+skip_empty = true

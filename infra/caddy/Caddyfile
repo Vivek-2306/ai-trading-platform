@@ -1,0 +1,16 @@
+# Reverse proxy and automatic HTTPS. SITE_ADDRESS is a domain (HTTPS, certificates automatic)
+# or ":80" for plain HTTP on a test machine.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Everything goes to the web app; it forwards the few allowed /api/* paths to the API.
+	reverse_proxy web:3000
+}

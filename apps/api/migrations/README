@@ -1,0 +1,8 @@
+Alembic migrations for the trading API (async SQLAlchemy).
+
+    uv run alembic upgrade head            # apply all migrations
+    uv run alembic downgrade -1            # undo the last one
+    uv run alembic revision --autogenerate -m "add candles table"
+    uv run alembic current / history
+
+The database URL comes from DATABASE_URL (see app/core/config.py).

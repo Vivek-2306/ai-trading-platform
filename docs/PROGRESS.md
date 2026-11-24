@@ -1,11 +1,11 @@
 # Progress
 
-**Last updated:** 2026-11-23 (laptop)
+**Last updated:** 2026-11-24 (laptop)
 
 ## Current phase
 
-Setup phases planned (Phase 1–6, AITP-1 … AITP-35). Waiting for the owner to review the
-tickets and say "go" for Phase 1. No application code yet.
+**Setup phases 1–6 are all merged into `develop`** (PRs #1–#6, #12). Waiting on the v0.1.0 release
+(`develop` → `main`). No feature phase yet: needs the owner's product decisions. See `docs/SETUP_REPORT.md`.
 
 ## Last completed
 
@@ -20,18 +20,53 @@ tickets and say "go" for Phase 1. No application code yet.
 - Local git-ignored `private/` folder created for personal notes.
 - Planning docs, ADR 0001 (stack, proposed) and ADR 0002 (Docker Compose, accepted).
 
+- Owner said "go" (stack approved, ADR 0001 Accepted). First commit `bbd94fc` on `develop`;
+  `main` created at the same commit; `develop` is GitHub's default branch.
+- Phase 1: AITP-1 monorepo root (`d680fa6`), AITP-2 README/CHANGELOG/.env.example (`9e17c0a`),
+  AITP-3 GitHub templates (`9e2932e`), AITP-4 Claude settings + format hook (`ef0bf7c`),
+  AITP-5 slash commands.
+
+- Phase 1 merged (PR #1). Branch protection on `main` and `develop` since 2026-11-23.
+- Phase 2: AITP-6 Python project in `apps/api` (uv, Python 3.13, core deps, module layout).
+- AITP-7 Ruff/mypy strict/pytest+coverage, wired into root `pnpm` scripts; format hook
+  proved working on a `.py` edit.
+- AITP-8 FastAPI `create_app()` factory, settings, `/health`, `/version`, `/docs`; 10 tests, 100% coverage of app code.
+- AITP-9 structlog (JSON in prod), X-Request-ID middleware, consistent JSON errors; 24 tests.
+- AITP-10 Dockerfile (`1423cb4`): image builds (263 MB), container answers `/health` and
+  `/version`, runs as non-root `app`, JSON logs. (Docker Desktop needed the owner's macOS
+  password once.)
+- AITP-11 CI workflow (`.github/workflows/ci.yml`, job "API (Python)"), with image smoke test.
+- Self-review fixes applied (headers on errors, no input echo, CORS wildcard rejected, 500s logged,
+  JSON-only prod logs); 34 tests.
+
+- Phase 2 merged (PR #2). "API (Python)" is a required check on `main` and `develop`.
+- Phase 3: AITP-12 dev Compose stack (TimescaleDB 2.32 + pgvector 0.8 verified, Redis 7), `pnpm infra:*`.
+- AITP-13 async SQLAlchemy engine/sessions, `Base` naming conventions, `/health/ready` (verified 200 against dev DB, 503 when down); 41 tests.
+- AITP-14 Alembic + baseline migration `0001` (timescaledb, vector); upgrade/downgrade/upgrade verified on dev DB and from the image; 44 tests.
+- AITP-15 async Redis client + readiness check (live: 200 → 503 when Redis stopped → 200); 46 tests.
+- AITP-16 Celery app + `ping`/`heartbeat` tasks, beat schedule; live round-trip through Redis verified; 51 tests.
+- AITP-17 integration tests (5) with testcontainers, in CI; dev DB image switched to pinned `timescale/timescaledb:2.32.1-pg17`.
+- Self-review fixes (`%` in DB passwords, startup cleanup, Celery visibility timeout and no redelivery loops, heartbeat results off, `pnpm beat` on fresh clones); 53 unit + 5 integration tests.
+
+- Phase 3 merged (PR #3, `892f48f`). Phase 4 started: AITP-18 Next.js 16 app in `apps/web` (strict TS, `/api/*` proxied to the API, repo-root env file loaded).
+- AITP-19 responsive glass UI shell (Tailwind v4, dark/light, bottom nav on phones), AITP-20 Biome + Vitest, AITP-21 `packages/api-client` generated from OpenAPI (CI checks it is fresh), AITP-22 live system status page (API/DB/Redis; verified Redis down → shows Down), AITP-36 validated env + pino logs + one request ID across web and API logs, AITP-37 `pnpm tunnel` (ngrok; verified from the public URL), AITP-23 web CI job. 10 web tests.
+
+- Phase 4 merged (PR #4). Phase 4b: AITP-39 Postman collection generated from OpenAPI (`pnpm api:postman`, CI checks it), AITP-38 Notion API Reference database (5 rows) + CLAUDE.md rule 12, AITP-40 log redaction, quiet health probes, optional `LOG_FILE` and `SENTRY_DSN`; 61 API tests.
+
+- Phase 4b merged (PR #5). Phase 5: uv groups `analysis` (pandas, NumPy, Polars, SciPy, statsmodels, TA-Lib, vectorbt, QuantStats, exchange-calendars), `ml` (scikit-learn, LightGBM, Optuna, MLflow, SHAP), `ai` (anthropic, voyageai, pgvector) + AI settings, `markets` (kiteconnect, ccxt, alpaca-py, polygon, finnhub, fredapi, feedparser, trafilatura, python-telegram-bot, websockets, tenacity); smoke tests + CI job; Dependabot. Findings: exchange-calendars has BSE (`XBOM`) but no NSE calendar; LightGBM needs `brew install libomp` on macOS (Linux image needs libgomp1, Phase 6). QuantStats pulls in yfinance (Yahoo scraping: fine for experiments, not a production data source); MLflow is the lightweight `mlflow-skinny` client, telemetry off in CI (`MLFLOW_DISABLE_TELEMETRY=true`; set it locally too).
+
+- Phase 5 merged (PR #6). Phase 6: AITP-30 pre-commit hooks (`pnpm hooks:install`), AITP-31 gitleaks in CI (full history clean), AITP-32 production Compose (web, API, worker, beat, db, redis, Caddy; verified locally, only Caddy exposed), AITP-33 quickstart verified from a fresh clone (`pnpm bootstrap`, `pnpm check`), AITP-34 branch protection script (4 required checks; `main` not strict so release PRs cannot deadlock), AITP-35 setup report + CHANGELOG 0.1.0.
+
 ## In progress
 
-Nothing. Waiting for the owner's review.
+Phase 6 merged (PR #12, 2026-11-24). Release v0.1.0 PR pending (AITP-35 stays In Review until tagged).
 
 ## Next up
 
-1. Owner reviews tickets in Notion and says "go" for Phase 1 (this also counts as approving the stack).
-2. On "go": first commit on `develop` ("chore: project setup" — `.gitignore`, `CLAUDE.md`,
-   `docs/`, `infra/`), push `develop`, create `main` at that same commit, set `develop` as
-   GitHub's default branch. Then branch `phase-1-repo-foundation` from `develop` and work
-   AITP-1 … AITP-5.
-3. Open the Phase 1 PR into `develop`, wait for owner review and merge.
+1. Release v0.1.0: PR `develop` → `main` (merge commit), then tag `v0.1.0` (`/release-phase release v0.1.0`).
+3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
+4. Owner: answer the open product decisions below, then plan feature phases (`/plan-project`).
+5. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 
 ## Open questions (owner decisions)
 
@@ -46,6 +81,9 @@ These are needed before feature phases, not before setup Phases 1–6.
 
 ## Known issues
 
+- Old dev volume `aitp_db-data` (from the previous timescaledb-ha image) is unused; the owner
+  can delete it with `docker volume rm aitp_db-data` (it only held an empty dev database).
+
 - Non-Claude prices in `docs/COSTS.md` are approximate and were not verified live.
 
 ## Session log
@@ -54,3 +92,4 @@ These are needed before feature phases, not before setup Phases 1–6.
 | --- | --- | --- |
 | 2026-11-23 | laptop | Setup answers, prerequisites, plan doc, project memory files, Docker Compose decision |
 | 2026-11-23 | laptop | GitHub repo created; Notion phases/tickets DBs + 35 tickets; PLAN.md; working mode → Claude implements, owner reviews PRs |
+| 2026-11-23 | laptop | Branching → develop/main; first commit on develop; Phase 1 (AITP-1 … 5) implemented, PR opened |
