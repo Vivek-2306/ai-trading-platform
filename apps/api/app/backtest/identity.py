@@ -25,6 +25,10 @@ _FILES = (
     "backtest/engine.py",
     "backtest/registry.py",
     "scalping/strategies.py",
+    "ml/dataset.py",
+    "ml/train.py",
+    "ml/strategy.py",
+    "ml/protocol.py",
 )
 
 
