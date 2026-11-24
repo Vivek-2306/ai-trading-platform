@@ -4,10 +4,10 @@
 
 ## Current phase
 
-**Phase 7b — Live streaming data** on `phase-7b-live-stream` (AITP-49 … 54). Phase 7 merged (PR #16).
-v0.1.0 released 2026-11-24. Later feature phases (8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
-Tickets: 49 stream service, 50 write 1m candles (Redis + TimescaleDB), 51 gap detection + REST backfill,
-52 aggregates/compression/retention, 53 live price API stream, 54 web live price on the chart.
+**Phase 8a — Indicators and rule signals** on `phase-8a-signals` (AITP-55 … 61). Phases 7 and 7b merged
+(PRs #16, #17). v0.1.0 released 2026-11-24. Later phases (8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md`.
+Tickets: 55 indicator library, 56 feature pipeline without look-ahead, 57 signals tables (append-only audit),
+58 rule engine, 59 scheduled signal run on candle close, 60 `GET /signals`, 61 web signals page.
 
 ## Last completed
 
@@ -63,11 +63,11 @@ Tickets: 49 stream service, 50 write 1m candles (Redis + TimescaleDB), 51 gap de
 
 ## In progress
 
-Phase 7b (live streaming), ticket by ticket.
+Phase 8a, ticket by ticket. Local dev servers (API :8000, stream, worker, beat, ngrok tunnel) were restarted from `develop` on 2026-11-24 so the public URL serves the current web app; logs are in `/tmp/aitp-run/`.
 
 ## Next up
 
-1. Phase 7b in progress; the owner reviews and merges its PR when opened.
+1. Phase 8a in progress; the owner reviews and merges its PR when opened.
 2. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 3. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 4. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
@@ -84,6 +84,12 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 - [x] Mobile app: after the web app.
 
 ## Known issues
+
+- Phase 8a limitations (deliberate, to revisit): the signals trigger guards against mistakes but the table owner
+  can still disable it (a non-owner app role would fix that); a candle corrected by the REST overwrite after its
+  signal was stored leaves that signal's inputs slightly out of step (rare; the close is stored for comparison);
+  `GET /signals` orders by recorded id, not candle time; rules-v1 thresholds are untested guesses until Phase 9
+  backtests measure them; a long uptrend often reads as NO TRADE because RSI/Bollinger rules disagree with trend.
 
 - Phase 7b limitations (deliberate, to revisit): quiet minutes on thin symbols (e.g. PAXG) have no 1m candle
   at all (Binance sends none), so the gap check reports them and the healer refetches them every 5 minutes;

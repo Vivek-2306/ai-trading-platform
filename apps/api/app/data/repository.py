@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.data.adapters.base import RawCandle
-from app.data.models import Candle, Instrument, Timeframe
+from app.data.models import Candle, Instrument, Signal, Timeframe
 from app.data.universe import InstrumentSpec
 
 # 8 columns per row; asyncpg allows 32,767 bind parameters per statement.
@@ -82,3 +82,25 @@ async def latest_candle_time(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def record_signal(session: AsyncSession, signal: Signal) -> bool:
+    """Append a signal. Returns False if one already exists for that instrument, timeframe,
+    candle and rule version (so running a signal job twice stores it once)."""
+    statement = (
+        insert(Signal)
+        .values(
+            instrument_id=signal.instrument_id,
+            timeframe=signal.timeframe,
+            candle_ts=signal.candle_ts,
+            action=signal.action,
+            confidence=signal.confidence,
+            reasons=signal.reasons,
+            inputs=signal.inputs,
+            rule_version=signal.rule_version,
+        )
+        .on_conflict_do_nothing(constraint="uq_signals_candle")
+    )
+    result = await session.execute(statement)
+    await session.commit()
+    return bool(result.rowcount)  # type: ignore[attr-defined]

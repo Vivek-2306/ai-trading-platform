@@ -52,6 +52,12 @@ def create_celery(settings: Settings) -> Celery:
                 "task": "app.worker.tasks.apply_candle_retention",
                 "schedule": crontab(hour=3, minute=30),
             },
+            # Ten and forty minutes past each hour, after the candle update. The second run
+            # catches a candle that was late the first time; both are safe (one signal per candle).
+            "run-signals": {
+                "task": "app.worker.tasks.run_signals",
+                "schedule": crontab(minute="10,40"),
+            },
             # Two minutes past each hour, once the exchange has published the closed candle.
             "update-candles": {
                 "task": "app.worker.tasks.update_candles",

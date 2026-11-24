@@ -132,3 +132,63 @@ export async function getCandles(
     return null;
   }
 }
+
+export type SignalReason = {
+  code: string;
+  text: string;
+  direction: "buy" | "sell" | "neutral" | "info" | string;
+  weight: number;
+};
+
+export type SignalAction = "BUY" | "SELL" | "HOLD" | "NO_TRADE";
+
+export type Signal = {
+  id: number;
+  instrument_id: number;
+  symbol: string;
+  venue: string;
+  timeframe: string;
+  candle_ts: string;
+  action: SignalAction;
+  /** How much of the rule weight agrees with the leading side, 0 to 1 (a decimal string). */
+  confidence: string;
+  reasons: SignalReason[];
+  inputs: Record<string, number | null>;
+  rule_version: string;
+  created_at: string;
+  /** The candle is old (the feed or the job stopped): do not act on this signal. */
+  stale?: boolean;
+};
+
+/** The newest signal per instrument and timeframe, or null if the API cannot answer. */
+export async function getLatestSignals(): Promise<Signal[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/signals/latest", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(6000),
+    });
+    return (data as Signal[] | undefined) ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "signals_unavailable");
+    return null;
+  }
+}
+
+/** Recent signals, newest first, or null if the API cannot answer. */
+export async function getRecentSignals(limit = 20): Promise<Signal[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/signals", {
+      params: { query: { limit } },
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(6000),
+    });
+    return (data?.signals as Signal[] | undefined) ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "signals_unavailable");
+    return null;
+  }
+}

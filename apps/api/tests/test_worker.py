@@ -71,3 +71,11 @@ def test_beat_schedules_daily_candle_retention() -> None:
 def test_retention_defaults_to_90_days_and_zero_keeps_everything() -> None:
     assert Settings(_env_file=None).candle_1m_retention_days == 90
     assert Settings(_env_file=None, candle_1m_retention_days=0).candle_1m_retention_days == 0
+
+
+def test_beat_runs_signals_after_the_candle_update() -> None:
+    update = celery_app.conf.beat_schedule["update-candles"]["schedule"]
+    signals = celery_app.conf.beat_schedule["run-signals"]
+
+    assert signals["task"] == "app.worker.tasks.run_signals"
+    assert min(signals["schedule"].minute) > max(update.minute)

@@ -832,3 +832,362 @@ def test_refresh_aggregates_materializes_old_minutes(postgres_url: str) -> None:
         return int(count.scalar_one())
 
     assert _run(postgres_url, work) == 2
+
+
+def test_signals_are_append_only(postgres_url: str) -> None:
+    from sqlalchemy.exc import DBAPIError
+
+    from app.data.models import AssetClass, Signal, Timeframe
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    ts = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    def sig(iid: int, action: str = "BUY", confidence: str = "0.7") -> Signal:
+        return Signal(
+            instrument_id=iid,
+            timeframe=Timeframe.H1.value,
+            candle_ts=ts,
+            action=action,
+            confidence=Decimal(confidence),
+            reasons=[{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
+            inputs={"rsi": 25.0},
+            rule_version="rules-v1",
+        )
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        spec = InstrumentSpec("binance", "ALGO/USDT", AssetClass.CRYPTO)
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        out: dict[str, object] = {}
+        out["first"] = await record_signal(session, sig(iid))
+        out["again"] = await record_signal(session, sig(iid, action="SELL"))  # same candle
+        for name, statement in (
+            ("update", "UPDATE signals SET action = 'SELL' WHERE instrument_id = :i"),
+            ("delete", "DELETE FROM signals WHERE instrument_id = :i"),
+        ):
+            try:
+                await session.execute(text(statement), {"i": iid})
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "append-only" if "append-only" in str(exc) else str(exc)
+        try:
+            await session.execute(text("TRUNCATE signals"))
+            await session.commit()
+            out["truncate"] = "allowed"
+        except DBAPIError as exc:
+            await session.rollback()
+            out["truncate"] = "append-only" if "append-only" in str(exc) else str(exc)
+        row = (
+            await session.execute(
+                text(
+                    "SELECT action, confidence, reasons, inputs FROM signals "
+                    "WHERE instrument_id = :i"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        out["row"] = (row.action, row.confidence, row.reasons, row.inputs)
+        for bad in ({"action": "MAYBE"}, {"confidence": "1.5"}):
+            try:
+                await record_signal(
+                    session, sig(iid, **bad).__class__(**{**_asdict(sig(iid)), **bad})
+                )
+                out["bad_" + next(iter(bad))] = "accepted"
+            except DBAPIError:
+                await session.rollback()
+                out["bad_" + next(iter(bad))] = "rejected"
+        return out
+
+    def _asdict(s: Signal) -> dict[str, object]:
+        return {
+            "instrument_id": s.instrument_id,
+            "timeframe": s.timeframe,
+            "candle_ts": s.candle_ts + timedelta(hours=1),
+            "action": s.action,
+            "confidence": s.confidence,
+            "reasons": s.reasons,
+            "inputs": s.inputs,
+            "rule_version": s.rule_version,
+        }
+
+    out = _run(postgres_url, work)
+    assert out["first"] is True
+    assert out["again"] is False  # one signal per instrument, timeframe, candle and rule version
+    assert out["update"] == out["delete"] == out["truncate"] == "append-only"
+    assert out["row"] == (
+        "BUY",
+        Decimal("0.7000"),
+        [{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
+        {"rsi": 25.0},
+    )  # untouched by the blocked update
+    assert out["bad_action"] == out["bad_confidence"] == "rejected"
+
+
+def test_signal_run_stores_one_signal_per_candle(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.signals.runner import run_signal
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(5)
+    start = datetime(2026, 8, 1, tzinfo=UTC)
+    price = 100.0
+    rows = []
+    spec = InstrumentSpec(
+        "binance", "SIGTEST/USDT", AssetClass.CRYPTO
+    )  # not shared with other tests
+
+    async def seed(session: AsyncSession) -> int:
+        nonlocal price
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        for i in range(120):
+            price *= 1 + rng.normal(0.0005, 0.01)
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+    now = start + timedelta(hours=120, minutes=10)  # just after the last candle closed
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        first = await run_signal(sessions, spec, Timeframe.H1, now=now)
+        second = await run_signal(sessions, spec, Timeframe.H1, now=now)
+        stale = await run_signal(sessions, spec, Timeframe.H1, now=now + timedelta(days=3))
+        none_for_unknown = await run_signal(
+            sessions,
+            InstrumentSpec("binance", "NOPE/USDT", AssetClass.CRYPTO),
+            Timeframe.H1,
+            now=now,
+        )
+        row = (
+            await session.execute(
+                text(
+                    "SELECT count(*) AS n, min(candle_ts) AS ts, min(action) AS action, "
+                    "min(rule_version) AS version, "
+                    "bool_and(jsonb_array_length(reasons) > 0) AS explained, "
+                    "bool_and(inputs ? 'rsi') AS has_inputs "
+                    "FROM signals WHERE instrument_id = :i"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        return {
+            "first": first,
+            "second": second,
+            "stale": stale,
+            "unknown": none_for_unknown,
+            "row": row,
+        }
+
+    out = _run(postgres_url, work)
+    last_candle = start + timedelta(hours=119)
+    first, second = out["first"], out["second"]
+    assert first is not None and second is not None
+    assert (first.stored, second.stored) == (True, False)  # type: ignore[attr-defined]
+    assert first.candle_ts == last_candle  # type: ignore[attr-defined]
+    assert out["stale"] is None  # data lagging: no signal about an old candle
+    assert out["unknown"] is None
+    row = out["row"]
+    assert row.n == 1 and row.ts == last_candle  # type: ignore[attr-defined]
+    assert row.version == "rules-v1" and row.explained and row.has_inputs  # type: ignore[attr-defined]
+
+
+def test_signal_task_survives_a_failing_instrument(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import Settings
+    from app.data.universe import InstrumentSpec
+    from app.worker import tasks
+
+    _migrate(postgres_url)
+    monkeypatch.setattr(
+        tasks, "get_settings", lambda: Settings(_env_file=None, database_url=postgres_url)
+    )
+
+    async def flaky(sessions: object, spec: InstrumentSpec, timeframe: object) -> None:
+        if spec.symbol == "ETH/USDT":
+            raise RuntimeError("boom")
+        return None
+
+    monkeypatch.setattr(tasks, "run_signal", flaky)
+
+    assert tasks.run_signals.apply().get() == {}  # nothing stored, and no exception escaped
+
+
+def test_signals_endpoints_filter_page_and_show_latest(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.data.models import AssetClass, Signal
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+
+    _migrate(postgres_url)
+    base = datetime(2026, 9, 1, tzinfo=UTC)
+
+    def sig(iid: int, tf: str, hours: int, action: str) -> Signal:
+        return Signal(
+            instrument_id=iid,
+            timeframe=tf,
+            candle_ts=base + timedelta(hours=hours),
+            action=action,
+            confidence=Decimal("0.6"),
+            reasons=[{"code": "trend_up", "text": "Uptrend.", "direction": "buy", "weight": 2.0}],
+            inputs={"rsi": 55.0},
+            rule_version="rules-v1",
+        )
+
+    async def seed(session: AsyncSession) -> tuple[int, int]:
+        a = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "SIGA/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        b = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "SIGB/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        await session.commit()
+        for hours, action in enumerate(["BUY", "HOLD", "SELL", "NO_TRADE"]):
+            await record_signal(session, sig(a, "1h", hours, action))
+        await record_signal(session, sig(a, "1d", 0, "HOLD"))
+        await record_signal(session, sig(b, "1h", 0, "BUY"))
+        return a, b
+
+    a, _b = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    with TestClient(create_app(settings)) as client:
+        mine = client.get("/signals", params={"instrument_id": a, "timeframe": "1h"}).json()
+        page1 = client.get(
+            "/signals", params={"instrument_id": a, "timeframe": "1h", "limit": 3}
+        ).json()
+        page2 = client.get(
+            "/signals",
+            params={
+                "instrument_id": a,
+                "timeframe": "1h",
+                "limit": 3,
+                "before_id": page1["next_before_id"],
+            },
+        ).json()
+        sells = client.get("/signals", params={"instrument_id": a, "action": "SELL"}).json()
+        latest = client.get("/signals/latest").json()
+
+    assert [s["action"] for s in mine["signals"]] == [
+        "NO_TRADE",
+        "SELL",
+        "HOLD",
+        "BUY",
+    ]  # newest first
+    assert mine["next_before_id"] is None
+    first = mine["signals"][0]
+    assert first["symbol"] == "SIGA/USDT" and first["confidence"] == "0.6000"
+    assert first["reasons"][0]["code"] == "trend_up" and first["inputs"] == {"rsi": 55.0}
+    assert [s["action"] for s in page1["signals"]] == ["NO_TRADE", "SELL", "HOLD"]
+    assert [s["action"] for s in page2["signals"]] == ["BUY"] and page2["next_before_id"] is None
+    assert [s["action"] for s in sells["signals"]] == ["SELL"]
+    mine_latest = {
+        (s["symbol"], s["timeframe"]): s["action"]
+        for s in latest
+        if s["symbol"] in {"SIGA/USDT", "SIGB/USDT"}
+    }
+    assert mine_latest == {
+        ("SIGA/USDT", "1d"): "HOLD",
+        ("SIGA/USDT", "1h"): "NO_TRADE",  # the newest candle, not the first stored
+        ("SIGB/USDT", "1h"): "BUY",
+    }
+
+
+def test_signal_run_skips_a_late_candle_and_flags_a_data_gap(postgres_url: str) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.signals.runner import run_signal
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(9)
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    spec = InstrumentSpec("binance", "GAPTEST/USDT", AssetClass.CRYPTO)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        price = 100.0
+        rows = []
+        for i in range(100):
+            price *= 1 + rng.normal(0, 0.01)
+            if i in (40, 41, 42):
+                continue  # three missing hourly candles
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        # Newest stored candle is hour 99; "now" is shortly after hour 99 closed: on time.
+        on_time = await run_signal(
+            sessions, spec, Timeframe.H1, now=start + timedelta(hours=100, minutes=10)
+        )
+        # An hour later the update job has not brought hour 100: the candle is late.
+        late = await run_signal(
+            sessions, spec, Timeframe.H1, now=start + timedelta(hours=101, minutes=10)
+        )
+        row = (
+            await session.execute(
+                text("SELECT action, reasons FROM signals WHERE instrument_id = :i"), {"i": iid}
+            )
+        ).one()
+        return {"on_time": on_time, "late": late, "row": row}
+
+    out = _run(postgres_url, work)
+    assert out["late"] is None  # skipped, nothing stored for a stale candle
+    on_time = out["on_time"]
+    assert on_time is not None and on_time.action.value == "NO_TRADE"  # type: ignore[attr-defined]
+    row = out["row"]
+    assert row.action == "NO_TRADE"  # type: ignore[attr-defined]
+    assert row.reasons[0]["code"] == "data_gap" and "3 candle" in row.reasons[0]["text"]  # type: ignore[attr-defined]

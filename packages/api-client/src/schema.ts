@@ -127,6 +127,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List signals
+         * @description Signals, newest recorded first. Filter by instrument, timeframe or action; page back with
+         *     `next_before_id`. Research output, not financial advice.
+         */
+        get: operations["list_signals_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/signals/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest signal per instrument and timeframe
+         * @description The newest signal for every instrument and timeframe that has one.
+         */
+        get: operations["latest_signals_signals_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/version": {
         parameters: {
             query?: never;
@@ -248,6 +289,71 @@ export interface components {
              * @enum {string}
              */
             status: "ready" | "not_ready";
+        };
+        /** ReasonOut */
+        ReasonOut: {
+            /** Code */
+            code: string;
+            /** Direction */
+            direction: string;
+            /** Text */
+            text: string;
+            /**
+             * Weight
+             * @default 0
+             */
+            weight: number;
+        };
+        /**
+         * SignalAction
+         * @enum {string}
+         */
+        SignalAction: "BUY" | "SELL" | "HOLD" | "NO_TRADE";
+        /** SignalOut */
+        SignalOut: {
+            action: components["schemas"]["SignalAction"];
+            /**
+             * Candle Ts
+             * Format: date-time
+             */
+            candle_ts: string;
+            /** Confidence */
+            confidence: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Inputs */
+            inputs: {
+                [key: string]: unknown;
+            };
+            /** Instrument Id */
+            instrument_id: number;
+            /** Reasons */
+            reasons: components["schemas"]["ReasonOut"][];
+            /** Rule Version */
+            rule_version: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+            /** Symbol */
+            symbol: string;
+            /** Timeframe */
+            timeframe: string;
+            /** Venue */
+            venue: string;
+        };
+        /** SignalsResponse */
+        SignalsResponse: {
+            /** Next Before Id */
+            next_before_id: number | null;
+            /** Signals */
+            signals: components["schemas"]["SignalOut"][];
         };
         /**
          * Timeframe
@@ -461,6 +567,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    list_signals_signals_get: {
+        parameters: {
+            query?: {
+                instrument_id?: number | null;
+                timeframe?: components["schemas"]["Timeframe"] | null;
+                action?: components["schemas"]["SignalAction"] | null;
+                limit?: number;
+                before_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignalsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_signals_signals_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignalOut"][];
                 };
             };
         };

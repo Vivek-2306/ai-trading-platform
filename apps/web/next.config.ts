@@ -7,6 +7,9 @@ loadEnvConfig(resolve(import.meta.dirname, "../.."));
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // The phone/tablet tunnel builds into its own folder, so a `next dev` or `next build` run
+  // for development can never overwrite the files the tunnel's server is serving.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   // Self-contained server for the Docker image; traced from the repo root (monorepo).
   output: "standalone",
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),

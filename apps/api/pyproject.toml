@@ -11,12 +11,14 @@ dependencies = [
     "celery[redis]>=5.7.0",
     "fastapi>=0.165.0",
     "httpx>=0.28.1",
+    "numpy>=2.5.5",
     "pydantic>=2.14.4",
     "pydantic-settings>=2.16.3",
     "redis>=8.2.0",
     "sentry-sdk>=3.0.0",
     "sqlalchemy[asyncio]>=2.1.9",
     "structlog>=26.1.0",
+    "ta-lib>=0.8.3.post1",
     "tenacity>=9.2.1",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -95,8 +97,8 @@ plugins = ["pydantic.mypy"]
 files = ["app", "tests"]
 
 [[tool.mypy.overrides]]
-# ccxt ships no type hints.
-module = ["ccxt", "ccxt.*"]
+# ccxt and ta-lib ship no type hints.
+module = ["ccxt", "ccxt.*", "talib", "talib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

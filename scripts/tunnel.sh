@@ -18,11 +18,14 @@ pids=()
 cleanup() { for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null || true; done; }
 trap cleanup EXIT INT TERM
 
+# Its own build folder: other `next dev` / `next build` runs must not overwrite what this serves.
+export NEXT_DIST_DIR=".next-tunnel"
+
 echo "Building the web app ..."
 pnpm --filter @aitp/web build >"$LOGDIR/build.log" 2>&1 || { cat "$LOGDIR/build.log"; exit 1; }
 
 # Run next directly (not through pnpm) so stopping the script really stops the server.
-(cd apps/web && exec env NODE_ENV=production PORT="$PORT" node_modules/.bin/next start) >"$LOGDIR/web.log" 2>&1 &
+(cd apps/web && exec env NODE_ENV=production PORT="$PORT" NEXT_DIST_DIR="$NEXT_DIST_DIR" node_modules/.bin/next start) >"$LOGDIR/web.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 1 30); do curl -fs "http://127.0.0.1:${PORT}/" >/dev/null 2>&1 && break; sleep 1; done
 curl -fs "http://127.0.0.1:${PORT}/" >/dev/null 2>&1 || { echo "Web server did not start:"; cat "$LOGDIR/web.log"; exit 1; }
@@ -44,7 +47,7 @@ done
 
 echo
 echo "Open on your phone or tablet:  $url"
-echo "Only /, /status and the /api health + version endpoints are reachable. Logs: $LOGDIR"
+echo "Reachable: /, /charts, /signals, /status, and the /api health, version and live-stream endpoints. Logs: $LOGDIR"
 echo "The link is public while this runs. Press Ctrl+C to stop."
 # macOS ships bash 3.2 (no `wait -n`): poll until either process dies.
 while kill -0 "${pids[0]}" 2>/dev/null && kill -0 "${pids[1]}" 2>/dev/null; do sleep 2; done

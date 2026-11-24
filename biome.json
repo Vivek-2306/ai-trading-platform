@@ -4,6 +4,7 @@
     "includes": [
       "**",
       "!**/.next",
+      "!**/.next-tunnel",
       "!**/node_modules",
       "!**/.venv",
       "!**/coverage",

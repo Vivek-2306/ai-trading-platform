@@ -82,6 +82,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.get_context().autocommit_block():
+        # Stop the refresh jobs first so a running job cannot collide with the drop.
+        op.execute("SELECT remove_continuous_aggregate_policy('candles_1h_agg', if_exists => true)")
+        op.execute("SELECT remove_continuous_aggregate_policy('candles_5m_agg', if_exists => true)")
         op.execute("DROP MATERIALIZED VIEW IF EXISTS candles_1h_agg")
         op.execute("DROP MATERIALIZED VIEW IF EXISTS candles_5m_agg")
     op.execute("SELECT remove_compression_policy('candles', if_exists => true)")
