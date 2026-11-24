@@ -4,10 +4,14 @@
 
 ## Current phase
 
-**Phase 9 — Backtesting** on `phase-9-backtest` (AITP-68 … 74). Phases 7, 7b, 8a, 8b merged (PRs #16 to #19).
-v0.1.0 released 2026-11-24. Later phases (9b, 10 to 12) are planned in `docs/PLAN.md`.
-Tickets: 68 backtest engine (fees, slippage, latency), 69 walk-forward + locked out-of-sample, 70 metrics,
-71 stored runs + Celery job + CLI, 72 leakage tests, 73 buy-and-hold benchmark, 74 API + web report.
+**Phase 9b — Scalping strategy research** on `phase-9b-scalping` (AITP-75 … 80). Phases 7 to 9 merged (PRs #16 to #20).
+v0.1.0 released 2026-11-24. Later phases (10 to 12) are planned in `docs/PLAN.md`.
+Tickets: 75 fee tiers and maker/taker model, 76 scalping strategies (rules only, fixed parameters), 77 backtests on
+1m/5m with walk-forward and one out-of-sample judgement each, 78 cost-drag analysis, 79 scalping risk limits
+(max trades per day, cooldown), 80 research report and go/no-go.
+
+Phase 9 result to remember: `rules-v2` does not beat buy-and-hold (hourly loses ~25 to 28% after costs; daily
+is roughly flat). The locked out-of-sample period for the swing rules is still unspent (owner's decision).
 
 ## Last completed
 
@@ -63,11 +67,12 @@ Tickets: 68 backtest engine (fees, slippage, latency), 69 walk-forward + locked 
 
 ## In progress
 
-Phase 9, ticket by ticket. Local servers run from `develop` after the 8b merge (logs in `/tmp/aitp-run/`).
+Phase 9b. 1m/5m history is being backfilled for BTC and ETH (log `/tmp/aitp-run/backfill-scalp.log`).
 
 ## Next up
 
-1. Phase 9 in progress; the owner reviews and merges its PR when opened.
+1. Phase 9b in progress; the owner reviews and merges its PR when opened.
+   Owner decision pending: whether to judge the swing rules' locked out-of-sample period (`docs/BACKTESTING.md`).
 2. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 3. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 4. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
