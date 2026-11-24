@@ -221,3 +221,30 @@ def test_works_on_real_features_end_to_end() -> None:
     assert decision.action in set(SignalAction)
     assert decision.reasons
     assert decision.inputs["rsi"] is not None
+
+
+def test_prices_in_reasons_are_readable_not_scientific() -> None:
+    decision = evaluate(
+        table(
+            {"macd_hist": 0.1},
+            ema_fast=64220.0,
+            ema_slow=60400.0,
+            close=63900.55,
+            sma_slow=60000.0,
+            macd_hist=0.3,
+            vwap=63000.0,
+        )
+    )
+
+    text = " ".join(r.text for r in decision.reasons)
+
+    assert "64,220.00" in text and "60,400.00" in text and "63,900.55" in text
+    assert "e+" not in text
+
+
+def test_fmt_handles_small_and_mid_prices() -> None:
+    from app.signals.rules import fmt
+
+    assert fmt(1234567.891) == "1,234,567.89"
+    assert fmt(2.5) == "2.5"
+    assert fmt(0.000123456) == "0.000123456"

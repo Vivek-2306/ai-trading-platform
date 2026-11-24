@@ -1,4 +1,4 @@
-import { Activity, CandlestickChart, LayoutDashboard } from "lucide-react";
+import { Activity, CandlestickChart, Compass, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/charts", label: "Charts", icon: CandlestickChart },
+  { href: "/signals", label: "Signals", icon: Compass },
   { href: "/status", label: "System status", icon: Activity },
 ];
 

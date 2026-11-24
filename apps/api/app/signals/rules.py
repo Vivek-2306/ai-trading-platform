@@ -69,6 +69,16 @@ class Decision:
     summary: str = field(default="")
 
 
+def fmt(value: float) -> str:
+    """A price for a human: thousands separators and sensible decimals, never 6.4e+04."""
+    magnitude = abs(value)
+    if magnitude >= 100:
+        return f"{value:,.2f}"
+    if magnitude >= 1:
+        return f"{value:.4f}".rstrip("0").rstrip(".")
+    return f"{value:.6g}"
+
+
 def _confidence(value: float) -> Decimal:
     clamped = min(max(value, 0.0), 1.0)
     return Decimal(str(clamped)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
@@ -90,7 +100,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "trend_up",
-                    f"Fast average ({fast:.4g}) is above the slow one ({slow:.4g}): uptrend.",
+                    f"Fast average ({fmt(fast)}) is above the slow one ({fmt(slow)}): uptrend.",
                     "buy",
                     2.0,
                 )
@@ -99,7 +109,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "trend_down",
-                    f"Fast average ({fast:.4g}) is below the slow one ({slow:.4g}): downtrend.",
+                    f"Fast average ({fmt(fast)}) is below the slow one ({fmt(slow)}): downtrend.",
                     "sell",
                     2.0,
                 )
@@ -111,7 +121,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "above_sma",
-                    f"Price ({close:.4g}) is above its {50}-candle average ({sma:.4g}).",
+                    f"Price ({fmt(close)}) is above its {50}-candle average ({fmt(sma)}).",
                     "buy",
                     1.0,
                 )
@@ -120,7 +130,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "below_sma",
-                    f"Price ({close:.4g}) is below its {50}-candle average ({sma:.4g}).",
+                    f"Price ({fmt(close)}) is below its {50}-candle average ({fmt(sma)}).",
                     "sell",
                     1.0,
                 )
@@ -176,7 +186,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "above_vwap",
-                    f"Price is above the volume-weighted average ({vwap:.4g}).",
+                    f"Price is above the volume-weighted average ({fmt(vwap)}).",
                     "buy",
                     0.5,
                 )
@@ -185,7 +195,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "below_vwap",
-                    f"Price is below the volume-weighted average ({vwap:.4g}).",
+                    f"Price is below the volume-weighted average ({fmt(vwap)}).",
                     "sell",
                     0.5,
                 )
