@@ -52,3 +52,10 @@ def test_tasks_are_registered() -> None:
 
 def test_heartbeat_result_is_not_stored() -> None:
     assert heartbeat.ignore_result is True
+
+
+def test_beat_schedules_the_candle_update_hourly() -> None:
+    entry = celery_app.conf.beat_schedule["update-candles"]
+
+    assert entry["task"] == "app.worker.tasks.update_candles"
+    assert entry["schedule"].minute == {2}

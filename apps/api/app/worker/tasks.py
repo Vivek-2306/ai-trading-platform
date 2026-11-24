@@ -13,7 +13,8 @@ from app.data.adapters.factory import build_adapter
 from app.data.backfill import backfill, years_ago
 from app.data.models import AssetClass, Timeframe
 from app.data.repository import get_or_create_instrument, insert_candles
-from app.data.universe import InstrumentSpec
+from app.data.universe import InstrumentSpec, default_universe
+from app.data.update import update_instrument
 from app.worker.celery_app import celery_app
 
 logger = get_logger(__name__)
@@ -65,3 +66,38 @@ def backfill_candles(
 ) -> int:
     """Load `years` of history for one instrument and timeframe. Returns new candles stored."""
     return asyncio.run(_backfill(venue, symbol, asset_class, timeframe, years))
+
+
+UPDATE_TIMEFRAMES = (Timeframe.H1, Timeframe.D1)
+
+
+async def _update_all() -> dict[str, int]:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    new_by_instrument: dict[str, int] = {}
+    try:
+        for spec in default_universe(twelve_data_enabled=settings.twelve_data_api_key is not None):
+            adapter = build_adapter(spec.venue, settings)
+            try:
+                for timeframe in UPDATE_TIMEFRAMES:
+                    key = f"{spec.venue}:{spec.symbol}:{timeframe.value}"
+                    try:
+                        result = await update_instrument(sessions, adapter, spec, timeframe)
+                    except Exception:
+                        # One failing instrument must not stop the others.
+                        logger.exception("candle_update_failed", instrument=key)
+                        continue
+                    new_by_instrument[key] = result.new
+            finally:
+                await adapter.aclose()
+    finally:
+        await engine.dispose()
+    return new_by_instrument
+
+
+# Safe to run twice: candles already stored are skipped.
+@celery_app.task(name="app.worker.tasks.update_candles", ignore_result=True)
+def update_candles() -> dict[str, int]:
+    """Fetch new candles for every tracked instrument and refill recent gaps."""
+    return asyncio.run(_update_all())

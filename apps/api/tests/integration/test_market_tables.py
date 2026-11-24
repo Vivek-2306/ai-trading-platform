@@ -197,3 +197,85 @@ def test_backfill_task_stores_candles_and_a_rerun_adds_none(
     second = tasks.backfill_candles.apply(args=("binance", "BTC/USDT", "crypto", "1h", 1)).get()
 
     assert (first, second) == (30, 0)
+
+
+def test_update_instrument_fetches_new_candles_and_refills_a_gap(postgres_url: str) -> None:
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles
+    from app.data.universe import InstrumentSpec
+    from app.data.update import update_instrument
+
+    _migrate(postgres_url)
+    now = datetime(2026, 3, 1, 12, 30, tzinfo=UTC)
+    start = datetime(2026, 3, 1, 0, tzinfo=UTC)  # 12 closed hourly candles by 12:00
+    full = [
+        RawCandle(
+            start + timedelta(hours=i), Decimal(1), Decimal(2), Decimal(1), Decimal(2), Decimal(3)
+        )
+        for i in range(12)
+    ]
+    spec = InstrumentSpec("binance", "ADA/USDT", AssetClass.CRYPTO)
+
+    class Source:
+        venue = "binance"
+
+        async def fetch_candles(
+            self, symbol: str, timeframe: object, since: datetime | None = None, limit: int = 500
+        ) -> list[RawCandle]:
+            return [c for c in full if since is None or c.ts >= since][:limit]
+
+        async def aclose(self) -> None:
+            return None
+
+    async def work(session: AsyncSession) -> tuple[int, int, int, int]:
+        bind = session.bind
+        sessions = async_sessionmaker(bind, expire_on_commit=False)
+        instrument = await get_or_create_instrument(session, spec)
+        await session.commit()
+        # Stored: hours 0-3 and 8-9, so there is a hole at 4-7 and new data after 9.
+        stored = [c for c in full if c.ts.hour in (0, 1, 2, 3, 8, 9)]
+        await insert_candles(session, instrument.id, Timeframe.H1, stored)
+        first = await update_instrument(sessions, Source(), spec, Timeframe.H1, now=now)
+        second = await update_instrument(sessions, Source(), spec, Timeframe.H1, now=now)
+        return first.new, first.gaps_found, first.gaps_refilled, second.new
+
+    new, gaps_found, refilled, second_new = _run(postgres_url, work)
+    assert new == 6  # hours 4-7 (gap) and 10-11 (new)
+    assert gaps_found == 1
+    assert refilled == 1
+    assert second_new == 0
+
+
+def test_update_task_survives_one_failing_instrument(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import Settings
+    from app.data.adapters.base import AdapterError
+    from app.worker import tasks
+
+    _migrate(postgres_url)
+
+    class Flaky:
+        venue = "binance"
+
+        async def fetch_candles(
+            self, symbol: str, timeframe: object, since: datetime | None = None, limit: int = 500
+        ) -> list[object]:
+            if symbol == "ETH/USDT":
+                raise AdapterError("boom")
+            return []
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        tasks, "get_settings", lambda: Settings(_env_file=None, database_url=postgres_url)
+    )
+    monkeypatch.setattr(tasks, "build_adapter", lambda venue, settings: Flaky())
+
+    result = tasks.update_candles.apply().get()
+
+    assert result["binance:BTC/USDT:1h"] == 0
+    assert "binance:ETH/USDT:1h" not in result
+    assert "binance:PAXG/USDT:1d" in result
