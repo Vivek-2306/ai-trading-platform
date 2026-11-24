@@ -127,6 +127,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/risk/kill-switch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch the kill switch on or off
+         * @description ON needs nothing. OFF needs the admin token.
+         */
+        post: operations["change_kill_switch_risk_kill_switch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/risk/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Risk limits and kill switch state
+         * @description The kill switch state with its recent changes, and the active risk limits.
+         */
+        get: operations["status_risk_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/signals": {
         parameters: {
             query?: never;
@@ -271,6 +311,61 @@ export interface components {
             /** Venue */
             venue: string;
         };
+        /** KillSwitchEventOut */
+        KillSwitchEventOut: {
+            /** Active */
+            active: boolean;
+            /** Actor */
+            actor: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Reason */
+            reason: string;
+        };
+        /** KillSwitchOut */
+        KillSwitchOut: {
+            /** Active */
+            active: boolean;
+            /** Actor */
+            actor?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Since */
+            since?: string | null;
+        };
+        /** KillSwitchRequest */
+        KillSwitchRequest: {
+            /** Active */
+            active: boolean;
+            /** Reason */
+            reason: string;
+        };
+        /** LimitsOut */
+        LimitsOut: {
+            /** Capital */
+            capital: string;
+            /** Max Capital Share Pct */
+            max_capital_share_pct: string;
+            /** Max Daily Loss Pct */
+            max_daily_loss_pct: string;
+            /** Max Open Positions */
+            max_open_positions: number;
+            /** Max Stop Distance Pct */
+            max_stop_distance_pct: string;
+            /** Min Risk Reward */
+            min_risk_reward: string;
+            /** Risk Per Trade Pct */
+            risk_per_trade_pct: string;
+            /** Stop Atr Multiple */
+            stop_atr_multiple: string;
+            /** Target Atr Multiple */
+            target_atr_multiple: string;
+        };
         /** QualityResponse */
         QualityResponse: {
             /** Instruments */
@@ -303,6 +398,13 @@ export interface components {
              * @default 0
              */
             weight: number;
+        };
+        /** RiskStatus */
+        RiskStatus: {
+            kill_switch: components["schemas"]["KillSwitchOut"];
+            limits: components["schemas"]["LimitsOut"];
+            /** Recent Events */
+            recent_events: components["schemas"]["KillSwitchEventOut"][];
         };
         /**
          * SignalAction
@@ -567,6 +669,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    change_kill_switch_risk_kill_switch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-admin-token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KillSwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KillSwitchOut"];
+                };
+            };
+            /** @description Wrong or missing admin token (switching off) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Switching off through the API is disabled (no token configured) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_risk_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskStatus"];
                 };
             };
         };

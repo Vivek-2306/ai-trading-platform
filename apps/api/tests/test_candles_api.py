@@ -40,3 +40,9 @@ def test_signals_filters_are_validated(client: TestClient) -> None:
         {"before_id": 0},
     ):
         assert client.get("/signals", params=params).status_code == 422, params
+
+
+def test_kill_switch_request_is_validated(client: TestClient) -> None:
+    assert client.post("/risk/kill-switch", json={"active": True}).status_code == 422
+    short = client.post("/risk/kill-switch", json={"active": True, "reason": "x"})
+    assert short.status_code == 422

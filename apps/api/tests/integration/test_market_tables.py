@@ -1191,3 +1191,119 @@ def test_signal_run_skips_a_late_candle_and_flags_a_data_gap(postgres_url: str) 
     row = out["row"]
     assert row.action == "NO_TRADE"  # type: ignore[attr-defined]
     assert row.reasons[0]["code"] == "data_gap" and "3 candle" in row.reasons[0]["text"]  # type: ignore[attr-defined]
+
+
+def test_kill_switch_state_audit_and_append_only(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import argparse
+
+    from sqlalchemy.exc import DBAPIError
+
+    from app.core.config import Settings
+    from app.risk import killswitch
+    from app.risk.killswitch import kill_switch_state, recent_events, set_kill_switch
+
+    _migrate(postgres_url)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        out: dict[str, object] = {}
+        await session.execute(text("ALTER TABLE kill_switch_events DISABLE TRIGGER USER"))
+        await session.execute(text("DELETE FROM kill_switch_events"))  # clean slate for the test
+        await session.execute(text("ALTER TABLE kill_switch_events ENABLE TRIGGER USER"))
+        await session.commit()
+        out["initial"] = (await kill_switch_state(session)).active
+        s1, changed1 = await set_kill_switch(session, active=True, actor="api", reason="outage")
+        s2, changed2 = await set_kill_switch(session, active=True, actor="api", reason="again")
+        s3, changed3 = await set_kill_switch(
+            session, active=False, actor="cli:me", reason="all clear"
+        )
+        out["flow"] = (s1.active, changed1, s2.active, changed2, s3.active, changed3)
+        out["audit"] = [
+            (e.active, e.actor, e.reason) for e in reversed(await recent_events(session))
+        ]
+        try:
+            await set_kill_switch(session, active=True, actor="api", reason=" ")
+            out["blank_reason"] = "accepted"
+        except ValueError:
+            out["blank_reason"] = "rejected"
+        for name, statement in (
+            ("update", "UPDATE kill_switch_events SET active = false"),
+            ("delete", "DELETE FROM kill_switch_events"),
+            ("truncate", "TRUNCATE kill_switch_events"),
+        ):
+            try:
+                await session.execute(text(statement))
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "append-only" if "append-only" in str(exc) else str(exc)
+        return out
+
+    out = _run(postgres_url, work)
+    assert out["initial"] is False  # off when nothing was ever recorded
+    assert out["flow"] == (True, True, True, False, False, True)  # the repeat changed nothing
+    assert out["audit"] == [(True, "api", "outage"), (False, "cli:me", "all clear")]
+    assert out["blank_reason"] == "rejected"
+    assert out["update"] == out["delete"] == out["truncate"] == "append-only"
+
+    # The command line writes to the same log.
+    monkeypatch.setattr(
+        "app.risk.killswitch.get_settings",
+        lambda: Settings(_env_file=None, database_url=postgres_url),
+    )
+    assert (
+        asyncio.run(killswitch._cli(argparse.Namespace(command="on", reason="from the cli"))) == 0
+    )
+
+    async def after(session: AsyncSession) -> tuple[bool, str | None]:
+        state = await kill_switch_state(session)
+        return state.active, state.reason
+
+    assert _run(postgres_url, after) == (True, "from the cli")
+
+
+def test_kill_switch_api_on_is_open_off_needs_the_token(
+    postgres_url: str, redis_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.main import create_app
+    from app.risk.limits import get_risk_limits
+
+    _migrate(postgres_url)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+
+    def post(client: TestClient, active: bool, token: str | None = None) -> int:
+        headers = {"X-Admin-Token": token} if token else {}
+        body = {"active": active, "reason": "testing the switch"}
+        return client.post("/risk/kill-switch", json=body, headers=headers).status_code
+
+    monkeypatch.delenv("RISK_ADMIN_TOKEN", raising=False)
+    get_risk_limits.cache_clear()
+    with TestClient(create_app(settings)) as client:
+        assert post(client, True) == 200  # switching ON needs nothing
+        assert client.get("/risk/status").json()["kill_switch"]["active"] is True
+        assert post(client, False) == 403  # no token configured: OFF only from the command line
+        assert post(client, False, "guess") == 403
+
+    monkeypatch.setenv("RISK_ADMIN_TOKEN", "open-sesame")
+    get_risk_limits.cache_clear()
+    try:
+        with TestClient(create_app(settings)) as client:
+            assert post(client, False) == 401  # token configured, none sent
+            assert post(client, False, "wrong") == 401
+            assert client.get("/risk/status").json()["kill_switch"]["active"] is True
+            assert post(client, False, "open-sesame") == 200
+            status = client.get("/risk/status").json()
+            assert status["kill_switch"]["active"] is False
+            assert status["limits"]["risk_per_trade_pct"] == "0.5"
+            assert "admin_token" not in str(status) and "open-sesame" not in str(status)
+            assert [e["active"] for e in status["recent_events"][:2]] == [False, True]
+    finally:
+        monkeypatch.delenv("RISK_ADMIN_TOKEN")
+        get_risk_limits.cache_clear()

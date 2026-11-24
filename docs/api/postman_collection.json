@@ -155,6 +155,83 @@
       ]
     },
     {
+      "name": "risk",
+      "item": [
+        {
+          "name": "Switch the kill switch on or off",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/risk/kill-switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "risk",
+                "kill-switch"
+              ],
+              "variable": []
+            },
+            "description": "Switch the kill switch on or off\n\nON needs nothing. OFF needs the admin token.\n\nDocumented responses: 200, 401, 403, 422"
+          }
+        },
+        {
+          "name": "Risk limits and kill switch state",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/risk/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "risk",
+                "status"
+              ],
+              "variable": []
+            },
+            "description": "Risk limits and kill switch state\n\nThe kill switch state with its recent changes, and the active risk limits.\n\nDocumented responses: 200"
+          }
+        }
+      ]
+    },
+    {
       "name": "signals",
       "item": [
         {
