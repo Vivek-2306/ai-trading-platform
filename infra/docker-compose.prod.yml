@@ -95,6 +95,22 @@ services:
       redis: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
 
+  # Live market data: streams 1-minute candles from Binance. Healthy while it keeps
+  # refreshing its Redis heartbeat. Restarts on its own after a crash.
+  stream:
+    <<: *api
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.stream.health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    command: ["python", "-m", "app.stream"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+
   beat:
     <<: *api
     healthcheck: { disable: true }  # beat has no port; the worker log shows its heartbeat task
