@@ -34,4 +34,13 @@ development. Accuracy must be measured, not assumed.
 - Easier: adding exchanges, timeframes and strategies; honest accuracy numbers.
 - Harder: gold needs a second provider and market-hours-aware gap checks (crypto is 24/7).
 - Watch: scalping may show no edge after fees; that is a valid result, not a failure.
-- Gold source decision (to fill in during AITP-43): _pending_.
+- **Gold source decision (AITP-43, 2026-11-24):**
+  - Default: `PAXG/USDT` on Binance through the existing `BinanceAdapter`. It works today with no key
+    (checked live), so gold data flows from day one, tracking spot gold closely but not exactly.
+  - Optional: true `XAU/USD` from Twelve Data through `TwelveDataAdapter`, enabled by setting
+    `TWELVE_DATA_API_KEY`. Free plan as checked 2026-11-24: 8 credits per minute, 800 per day, one
+    `time_series` call costs 1 credit per symbol. That is plenty for hourly and daily candles of one
+    symbol. Forex pairs have no volume (stored as 0). I could not confirm from public docs that XAU/USD
+    is included in the free plan, and the adapter's tests use a fixture written from the documented
+    response format, not a live recording. First step once a key exists: one live call to verify.
+  - Gold trades Monday to Friday only while PAXG trades 24/7, so gap checks must know the venue's hours.

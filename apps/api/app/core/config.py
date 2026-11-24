@@ -63,13 +63,21 @@ class Settings(BaseSettings):
     # AI. Keys are optional until a feature needs them; SecretStr keeps them out of logs and reprs.
     anthropic_api_key: SecretStr | None = None
     voyage_api_key: SecretStr | None = None
+    # Gold (XAU/USD) candles from Twelve Data. Optional: without it, gold uses PAXG/USDT on Binance.
+    twelve_data_api_key: SecretStr | None = None
     ai_model_bulk: str = "claude-haiku-5-5"  # cheap, high-volume work such as news tagging
     ai_model_reasoning: str = "claude-opus-5-5"  # final reasoning on a signal
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 
     @field_validator(
-        "anthropic_api_key", "voyage_api_key", "sentry_dsn", "log_file", "git_sha", mode="before"
+        "anthropic_api_key",
+        "voyage_api_key",
+        "twelve_data_api_key",
+        "sentry_dsn",
+        "log_file",
+        "git_sha",
+        mode="before",
     )
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
