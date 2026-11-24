@@ -11,6 +11,9 @@ its own period) on the tuning region only. Measures:
   out-of-fold predictions whose labels had already finished (purged), never on its own fold.
 - Precision at thresholds against the break-even win rate. With a 1.6:1 payoff the break-even
   is 1/2.6 = 38.5% before costs, and higher after them, which is the number that matters.
+- Notes: the calibrated numbers cover only rows after the first fold, so compare them with
+  the raw numbers by eye, not row for row; the break-even uses the mean ATR% of the scored rows
+  (slightly optimistic where volatility is low); costs ignore slippage (a lower bound).
 - The rules baseline: how often rules-v2 BUY signals hit their target on the same rows.
 """
 
@@ -152,7 +155,9 @@ def evaluate_model(
     y, p = data.y[scored], result.proba[scored]
     calibrated = platt_walk_forward(data, result.proba, folds)
     cal_mask = np.isfinite(calibrated)
-    train_rate = float(data.y[: int(np.flatnonzero(scored)[0])].mean())
+    first_row = int(np.flatnonzero(scored)[0])
+    finished = data.label_end[:first_row] < data.index[first_row]  # purged, like the folds
+    train_rate = float(data.y[:first_row][finished].mean())
     table = compute_features(series)
     atr_pct = float(np.nanmean(table["atr_percent"][data.index[scored]]))
     bins, ece = reliability(y, p)

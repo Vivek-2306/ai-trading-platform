@@ -12,9 +12,9 @@ whether a 1.6 ATR target is hit before a 1.0 ATR stop, well enough to beat the r
 | Instrument | TF | Rows scored | AUC | Brier (model) | Brier (base rate) | Brier (coin) | Calibration error | Break-even win rate |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | BTC/USDT | 1h | 23000 | 0.515 | 0.2374 | 0.2328 | 0.2500 | 0.050 | 50.2% |
-| BTC/USDT | 1d | 1000 | 0.560 | 0.2654 | 0.2510 | 0.2500 | 0.132 | 40.6% |
+| BTC/USDT | 1d | 1000 | 0.560 | 0.2654 | 0.2542 | 0.2500 | 0.132 | 40.6% |
 | ETH/USDT | 1h | 23000 | 0.505 | 0.2396 | 0.2339 | 0.2500 | 0.054 | 47.0% |
-| ETH/USDT | 1d | 1000 | 0.502 | 0.2805 | 0.2447 | 0.2500 | 0.181 | 40.1% |
+| ETH/USDT | 1d | 1000 | 0.502 | 0.2805 | 0.2452 | 0.2500 | 0.181 | 40.1% |
 
 AUC of 0.5 is a coin flip; a model that knows something has a Brier score below the
 base-rate column. Break-even is the win rate a 1.6:1 trade needs after a 20 bps round trip.
