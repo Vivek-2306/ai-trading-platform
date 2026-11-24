@@ -1792,3 +1792,45 @@ def _latest_run(url: str) -> int:
         )
 
     return _run(url, get)
+
+
+def test_backtest_endpoints_list_filter_and_show_a_run(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.backtest.engine import BacktestConfig
+    from app.backtest.runner import run_and_store
+    from app.core.config import Settings
+    from app.main import create_app
+
+    _, spec = _seed_walk(postgres_url, "APITEST/USDT", seed=55)
+    config = BacktestConfig("APITEST/USDT", "1h")
+
+    async def work(session: AsyncSession) -> list[int]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        runs = await run_and_store(sessions, spec, config)  # type: ignore[arg-type]
+        return [r.id for r in runs]
+
+    ids = _run(postgres_url, work)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    with TestClient(create_app(settings)) as client:
+        listing = client.get("/backtests", params={"symbol": "APITEST/USDT"}).json()
+        tuning_only = client.get(
+            "/backtests", params={"symbol": "APITEST/USDT", "segment": "tuning"}
+        ).json()
+        detail = client.get(f"/backtests/{ids[0]}").json()
+        missing = client.get("/backtests/999999")
+
+    assert [r["segment"] for r in listing] == ["walk_forward", "tuning"]  # newest first
+    assert [r["segment"] for r in tuning_only] == ["tuning"]
+    first = tuning_only[0]
+    assert first["symbol"] == "APITEST/USDT" and first["config_hash"] == config.config_hash()
+    assert "total_return_pct" in first["metrics"] and "verdict" in first["benchmark"]
+    assert detail["config"]["fee_pct"] == "0.1" and len(detail["data_fingerprint"]) == 64
+    assert isinstance(detail["trades"], list) and set(detail["equity"]) == {
+        "times",
+        "strategy",
+        "benchmark",
+    }
+    assert missing.status_code == 404
