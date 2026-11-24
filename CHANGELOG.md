@@ -8,6 +8,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Production Compose stack for one server (web, API, worker, beat, database, Redis, Caddy with automatic HTTPS), web Docker image, `infra/prod.env.example` (AITP-32).
 - Pre-commit hooks (`pnpm hooks:install`: whitespace, Ruff, Biome, gitleaks) and a CI secret scan of the full git history (AITP-30, AITP-31).
 - Dependency groups `analysis`, `ml`, `ai`, `markets` (uv, install with `--all-groups`), AI settings fields, import smoke tests (CI job "Packages"), and Dependabot for uv, npm, Actions and Docker (AITP-24 … 29).
 - Postman collection generated from OpenAPI (`docs/api/`, `pnpm api:postman`, CI-checked), Notion API Reference database, and logging hardening: secret redaction, quiet health probes, optional rotating `LOG_FILE`, optional Sentry via `SENTRY_DSN` (AITP-38 … 40).

@@ -7,6 +7,9 @@ loadEnvConfig(resolve(import.meta.dirname, "../.."));
 
 const config: NextConfig = {
   reactStrictMode: true,
+  // Self-contained server for the Docker image; traced from the repo root (monorepo).
+  output: "standalone",
+  outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
   poweredByHeader: false,
   transpilePackages: ["@aitp/api-client"],
   serverExternalPackages: ["pino", "pino-pretty"],

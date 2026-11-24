@@ -99,6 +99,12 @@ jobs:
       - name: Build
         run: pnpm --filter @aitp/web build
 
+      - name: Build web Docker image
+        run: docker build -f apps/web/Dockerfile -t aitp-web:ci .
+
+      - name: Production Compose file is valid
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/docker-compose.prod.yml config -q
+
       # The generated client must match the API. Needs Python, to read the API's schema.
       - name: Set up uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0

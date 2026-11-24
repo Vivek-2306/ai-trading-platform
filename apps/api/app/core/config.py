@@ -68,7 +68,9 @@ class Settings(BaseSettings):
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 
-    @field_validator("anthropic_api_key", "voyage_api_key", "sentry_dsn", "log_file", mode="before")
+    @field_validator(
+        "anthropic_api_key", "voyage_api_key", "sentry_dsn", "log_file", "git_sha", mode="before"
+    )
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
         """`ANTHROPIC_API_KEY=` in an env file means "not set", not an empty secret."""
