@@ -11,10 +11,10 @@ pnpm --filter @aitp/web test     # Vitest
 
 One env file for the whole repo, at the repo root (copy `.env.example` to `.env`). The web app reads:
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `API_URL` | `http://127.0.0.1:8000` | Where the web server reaches the API |
-| `LOG_LEVEL` | `info` | `debug`, `info`, `warning` or `error` (shared with the API) |
+| Variable    | Default                 | Meaning                                                     |
+| ----------- | ----------------------- | ----------------------------------------------------------- |
+| `API_URL`   | `http://127.0.0.1:8000` | Where the web server reaches the API                        |
+| `LOG_LEVEL` | `info`                  | `debug`, `info`, `warning` or `error` (shared with the API) |
 
 Values are validated at startup (`src/lib/env.ts`); a bad value stops the app with a clear message.
 
