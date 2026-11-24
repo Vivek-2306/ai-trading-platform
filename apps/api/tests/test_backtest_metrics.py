@@ -110,7 +110,8 @@ def test_exposure_is_the_share_of_candles_in_a_position() -> None:
 def test_too_few_trades_carries_a_warning() -> None:
     few = compute_metrics(result([trade("10")] * 5, ["1000"] * 5))
     none = compute_metrics(result([], ["1000"] * 5))
-    enough = compute_metrics(result([trade("10")] * MIN_MEANINGFUL_TRADES, ["1000"] * 5))
+    mixed = [trade("10"), trade("-8")] * (MIN_MEANINGFUL_TRADES // 2)
+    enough = compute_metrics(result(mixed, ["1000"] * 5))
 
     assert "Only 5 trades" in few.warnings[0] and "noise" in few.warnings[0]
     assert none.warnings == ["No trades: there is nothing to measure."]
