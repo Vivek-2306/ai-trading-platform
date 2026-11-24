@@ -50,6 +50,11 @@ jobs:
       - name: Integration tests (real TimescaleDB + Redis via testcontainers)
         run: uv run pytest -m integration --cov-append
 
+      - name: Postman collection is up to date
+        run: |
+          uv run python scripts/export_postman.py ../../docs/api
+          git diff --exit-code -- ../../docs/api
+
       - name: Build Docker image
         run: docker build --build-arg GIT_SHA=${GITHUB_SHA::7} -t aitp-api:ci .
 

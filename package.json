@@ -22,7 +22,8 @@
     "worker": "pnpm --filter @aitp/api worker",
     "beat": "pnpm --filter @aitp/api beat",
     "test:integration": "pnpm --filter @aitp/api test:integration",
-    "tunnel": "bash scripts/tunnel.sh"
+    "tunnel": "bash scripts/tunnel.sh",
+    "api:postman": "pnpm --filter @aitp/api postman"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
