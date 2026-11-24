@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Phase 6 — Quality gates, deploy base and v0.1.0** on `phase-6-quality-deploy` (AITP-30 … 35).
-Phases 1–5 merged into `develop` (PRs #1–#6). See `docs/SETUP_REPORT.md`.
+**Setup phases 1–6 are all merged into `develop`** (PRs #1–#6, #12). Waiting on the v0.1.0 release
+(`develop` → `main`). No feature phase yet: needs the owner's product decisions. See `docs/SETUP_REPORT.md`.
 
 ## Last completed
 
@@ -59,12 +59,11 @@ Phases 1–5 merged into `develop` (PRs #1–#6). See `docs/SETUP_REPORT.md`.
 
 ## In progress
 
-Phase 6 PR into `develop` (owner review).
+Phase 6 merged (PR #12, 2026-11-24). Release v0.1.0 PR pending (AITP-35 stays In Review until tagged).
 
 ## Next up
 
-1. Owner reviews and merges the Phase 6 PR; then `/release-phase 6`.
-2. Release v0.1.0: PR `develop` → `main` (merge commit), then tag `v0.1.0` (`/release-phase release v0.1.0`).
+1. Release v0.1.0: PR `develop` → `main` (merge commit), then tag `v0.1.0` (`/release-phase release v0.1.0`).
 3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
 4. Owner: answer the open product decisions below, then plan feature phases (`/plan-project`).
 5. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
