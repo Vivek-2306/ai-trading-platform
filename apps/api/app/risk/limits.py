@@ -36,6 +36,11 @@ class RiskLimits(BaseSettings):
     # No new entries once today's realised losses reach this percent of capital. Ceiling 10%.
     max_daily_loss_pct: Decimal = Field(default=D("2"), gt=0, le=10)
     max_open_positions: int = Field(default=3, ge=1, le=20)
+    # Scalping: a fast strategy can overtrade. No new entry after this many in one UTC day, and a
+    # pause after a run of losses.
+    max_trades_per_day: int = Field(default=20, ge=1, le=500)
+    cooldown_after_losses: int = Field(default=3, ge=1, le=20)
+    cooldown_minutes: int = Field(default=60, ge=0, le=1440)
     # A setup must offer at least this much reward for each unit of risk.
     min_risk_reward: Decimal = Field(default=D("1.5"), ge=1)
     # Stop and target distances in ATR multiples (ATR = average candle range).

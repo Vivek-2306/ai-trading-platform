@@ -23,7 +23,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
@@ -63,6 +63,10 @@ class BacktestConfig:
     stop_atr_multiple: Decimal = D("1.5")
     target_atr_multiple: Decimal = D("3")
     max_stop_distance_pct: Decimal = D("10")
+    # Scalping guard rails (see RiskLimits): trade cap per UTC day, pause after a run of losses.
+    max_trades_per_day: int = 20
+    cooldown_after_losses: int = 3
+    cooldown_minutes: int = 60
 
     def __post_init__(self) -> None:
         negative_maker = self.maker_fee_pct is not None and self.maker_fee_pct < 0
@@ -98,6 +102,9 @@ class BacktestConfig:
             stop_atr_multiple=self.stop_atr_multiple,
             target_atr_multiple=self.target_atr_multiple,
             max_stop_distance_pct=self.max_stop_distance_pct,
+            max_trades_per_day=self.max_trades_per_day,
+            cooldown_after_losses=self.cooldown_after_losses,
+            cooldown_minutes=self.cooldown_minutes,
         )
 
 
@@ -215,9 +222,13 @@ def run_backtest(
     stats = {"decisions": 0, "buy_signals": 0, "vetoed": 0, "skipped_fills": 0}
     decisions: list[tuple[int, str]] = []
     losses_by_day: dict[str, Decimal] = {}
+    entries_by_day: dict[str, int] = {}
+    consecutive_losses = 0
+    cooldown_until: datetime | None = None
+    cooldown_seconds = config.cooldown_minutes * 60
 
     def close_position(index: int, price: Decimal, reason: str, market: bool) -> None:
-        nonlocal cash, position
+        nonlocal cash, position, consecutive_losses, cooldown_until
         assert position is not None
         fill = _slip(price, config.slippage_bps, "sell") if market else price
         proceeds = position.quantity * fill
@@ -242,6 +253,12 @@ def run_backtest(
         if pnl < 0:
             day = ordered[index].ts.date().isoformat()
             losses_by_day[day] = losses_by_day.get(day, D(0)) - pnl
+            consecutive_losses += 1
+            if consecutive_losses >= config.cooldown_after_losses:
+                cooldown_until = ordered[index].ts + timedelta(seconds=cooldown_seconds)
+                consecutive_losses = 0
+        else:
+            consecutive_losses = 0
         position = None
 
     for i in range(n):
@@ -283,6 +300,8 @@ def run_backtest(
                         cost = quantity * fill
                         fee = _fee(cost, config.fee_pct)
                         cash -= cost + fee
+                        entry_day = candle.ts.date().isoformat()
+                        entries_by_day[entry_day] = entries_by_day.get(entry_day, 0) + 1
                         position = _Position(
                             quantity=quantity,
                             entry_price=fill,
@@ -325,7 +344,12 @@ def run_backtest(
                 entry=candle.close,
                 atr=decision.inputs.get("atr"),
                 limits=config.risk_limits(max(cash, D("0.00000001"))),
-                state=PortfolioState(0, losses_by_day.get(day, D(0))),
+                state=PortfolioState(
+                    0,
+                    losses_by_day.get(day, D(0)),
+                    entries_by_day.get(day, 0),
+                    cooldown_until is not None and candle.ts < cooldown_until,
+                ),
                 kill_switch_on=False,
             )
             if assessment.action is SignalAction.BUY:
