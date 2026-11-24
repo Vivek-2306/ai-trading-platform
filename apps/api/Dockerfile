@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
 # AI Trading Platform API image. Build from apps/api:
 #   docker build -t aitp-api --build-arg GIT_SHA=$(git rev-parse --short HEAD) .
+# Run migrations with the same image:
+#   docker run --rm -e DATABASE_URL=... aitp-api alembic upgrade head
 
 ARG PYTHON_VERSION=3.13
 
@@ -19,6 +21,8 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 # ---- runtime: slim image, non-root user, no build tools ----
 FROM python:${PYTHON_VERSION}-slim AS runtime
@@ -28,6 +32,8 @@ RUN groupadd --system app && useradd --system --gid app --home-dir /app --no-cre
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=builder --chown=app:app /app/app /app/app
+COPY --from=builder --chown=app:app /app/alembic.ini /app/alembic.ini
+COPY --from=builder --chown=app:app /app/migrations /app/migrations
 
 ARG GIT_SHA=""
 ENV PATH="/app/.venv/bin:${PATH}" \

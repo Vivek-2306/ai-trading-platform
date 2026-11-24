@@ -1,23 +1,44 @@
-# Local dev: database + Redis only. API and web run natively.
+# Local development stack: database + Redis only. The API and web app run natively.
+#
+# Start/stop from the repo root (reads the root env file if you have one):
+#   pnpm infra:up     pnpm infra:down     pnpm infra:logs
+#
+# Ports bind to 127.0.0.1 only, so nothing is reachable from your network.
+name: aitp
+
 services:
   db:
-    image: timescale/timescaledb-ha:pg17 # Postgres + TimescaleDB + pgvector in one image
+    # Postgres 17 + TimescaleDB + pgvector. Same pinned image as the integration tests and CI.
+    image: timescale/timescaledb:2.32.1-pg17
     environment:
-      POSTGRES_USER: trading
-      POSTGRES_PASSWORD: trading_dev # dev-only password; never reuse
-      POSTGRES_DB: trading
-    ports: [ "5432:5432" ]
-    volumes: [ db-data:/home/postgres/pgdata ]
+      POSTGRES_USER: ${POSTGRES_USER:-trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trading_dev} # dev-only default; never reuse
+      POSTGRES_DB: ${POSTGRES_DB:-trading}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U trading" ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trading} -d ${POSTGRES_DB:-trading}"]
       interval: 5s
-      retries: 10
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports: [ "6379:6379" ]
-    volumes: [ redis-data:/data ]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
 volumes:
-  db-data:
+  pg-data:
   redis-data:

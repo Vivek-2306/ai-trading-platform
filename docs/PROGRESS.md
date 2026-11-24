@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Phase 2 — Backend API skeleton** on `phase-2-api-skeleton` (AITP-6 … AITP-11).
-Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
+**Phase 3 — Local infrastructure and data layer** on `phase-3-data-layer` (AITP-12 … AITP-17).
+Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and closed out.
 
 ## Last completed
 
@@ -39,19 +39,30 @@ Phase 1 merged into `develop` (PR #1, merge `45fbeb7`) and closed out.
 - Self-review fixes applied (headers on errors, no input echo, CORS wildcard rejected, 500s logged,
   JSON-only prod logs); 34 tests.
 
+- Phase 2 merged (PR #2). "API (Python)" is a required check on `main` and `develop`.
+- Phase 3: AITP-12 dev Compose stack (TimescaleDB 2.32 + pgvector 0.8 verified, Redis 7), `pnpm infra:*`.
+- AITP-13 async SQLAlchemy engine/sessions, `Base` naming conventions, `/health/ready` (verified 200 against dev DB, 503 when down); 41 tests.
+- AITP-14 Alembic + baseline migration `0001` (timescaledb, vector); upgrade/downgrade/upgrade verified on dev DB and from the image; 44 tests.
+- AITP-15 async Redis client + readiness check (live: 200 → 503 when Redis stopped → 200); 46 tests.
+- AITP-16 Celery app + `ping`/`heartbeat` tasks, beat schedule; live round-trip through Redis verified; 51 tests.
+- AITP-17 integration tests (5) with testcontainers, in CI; dev DB image switched to pinned `timescale/timescaledb:2.32.1-pg17`.
+- Self-review fixes (`%` in DB passwords, startup cleanup, Celery visibility timeout and no redelivery loops, heartbeat results off, `pnpm beat` on fresh clones); 53 unit + 5 integration tests.
+
 ## In progress
 
-Phase 2 PR #2 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/2
-CI green (22 s). "API (Python)" is a required check on `main` and `develop` (branch must be
-up to date before merging).
+Phase 3 PR #3 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/3
+CI green in 1m14s, including integration tests against real TimescaleDB + Redis.
 
 ## Next up
 
-1. Owner reviews and merges PR #2; then `/release-phase 2`.
-2. Phase 3 — Local infrastructure and data layer (AITP-12 … AITP-17) after the owner says "go".
-3. Open owner decision: the deny rule `Bash(* .env.*)` is too broad (blocks any command that
-   merely mentions an env file name, e.g. commit messages). Proposed: narrow it to reader
-   commands (cat/less/more/head/tail/grep/source).
+1. Owner reviews and merges PR #3; then `/release-phase 3`.
+2. Phase 4 — Web app skeleton (AITP-18 … AITP-23) after the owner says "go".
+3. Owner decisions on permissions:
+   - The deny rule `Bash(* .env.*)` is too broad (blocks any command that merely mentions an
+     env file name, e.g. commit messages). Proposed: narrow it to reader commands.
+   - `Read(**/.env.*)` also blocks *editing* the example env file. Pending addition there:
+     `POSTGRES_PORT=5432` and `REDIS_PORT=6379` (optional; the compose file has defaults).
+     Either the owner adds them, or allows Claude to edit the example file.
 
 ## Open questions (owner decisions)
 
@@ -65,6 +76,9 @@ up to date before merging).
 These are needed before feature phases, not before setup Phases 1–6.
 
 ## Known issues
+
+- Old dev volume `aitp_db-data` (from the previous timescaledb-ha image) is unused; the owner
+  can delete it with `docker volume rm aitp_db-data` (it only held an empty dev database).
 
 - Non-Claude prices in `docs/COSTS.md` are approximate and were not verified live.
 

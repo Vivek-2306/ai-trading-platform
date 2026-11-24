@@ -44,8 +44,11 @@ jobs:
       - name: Type-check (mypy strict)
         run: uv run mypy
 
-      - name: Test (pytest)
+      - name: Unit tests (pytest)
         run: uv run pytest
+
+      - name: Integration tests (real TimescaleDB + Redis via testcontainers)
+        run: uv run pytest -m integration --cov-append
 
       - name: Build Docker image
         run: docker build --build-arg GIT_SHA=${GITHUB_SHA::7} -t aitp-api:ci .

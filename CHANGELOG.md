@@ -34,6 +34,31 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   echo submitted values; `CORS_ORIGINS=*` is rejected; failed requests are still logged
   with status 500 and request context is cleared after each request; uvicorn/stdlib logs
   are JSON in production and the duplicate access log is off (AITP-8 … AITP-11).
+- Dev Compose stack finalised: Postgres 17 + TimescaleDB + pgvector and Redis 7 with
+  healthchecks, named volumes, localhost-only ports and env-driven credentials;
+  `pnpm infra:up/down/logs/ps` (AITP-12).
+- Async database layer: SQLAlchemy 2 + asyncpg engine created at startup and disposed at
+  shutdown, a per-request session dependency, a declarative base with constraint naming
+  conventions, and `GET /health/ready` (503 when a dependency is down) (AITP-13).
+- Alembic migrations (async, URL from settings, dated file names) with a baseline that enables
+  TimescaleDB and pgvector; `pnpm db:migrate`; migrations ship in the Docker image (AITP-14).
+- Async Redis client created at startup and closed at shutdown; `/health/ready` reports
+  database and Redis separately (AITP-15).
+- Celery worker and beat on Redis (JSON-only, acks-late, one task at a time, UTC, structlog
+  logging) with a `ping` task and a minutely `heartbeat`; `pnpm worker` / `pnpm beat` (AITP-16).
+- Integration tests against real TimescaleDB and Redis via testcontainers (migrations
+  up/down/up, readiness healthy and unhealthy, DB session and Redis round-trips), run in CI;
+  `pnpm test:integration` (AITP-17).
+- Self-review fixes: migrations accept URL-encoded passwords containing `%`; the app's
+  startup closes already-opened clients if a later step fails; Celery tasks are redelivered
+  only after a 6-hour visibility timeout (configurable) and never after crashing a worker;
+  the heartbeat stores no results; `pnpm beat` works on a fresh clone (AITP-13 … AITP-17).
+
+### Changed (Phase 3)
+
+- Dev database image switched from `timescaledb-ha:pg17` (3.7 GB) to the pinned
+  `timescale/timescaledb:2.32.1-pg17` (same TimescaleDB 2.32.1 + pgvector 0.8.7, smaller),
+  shared by dev, tests and CI (AITP-17).
 
 ### Changed
 

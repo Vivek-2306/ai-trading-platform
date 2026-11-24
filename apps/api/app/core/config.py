@@ -44,6 +44,21 @@ class Settings(BaseSettings):
     # Set by CI / the Docker build so /version can report exactly what is running.
     git_sha: str | None = None
 
+    # Dev default matches infra/docker-compose.dev.yml; production always sets DATABASE_URL.
+    database_url: str = "postgresql+asyncpg://trading:trading_dev@localhost:5432/trading"
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    # Cache, live prices and pub/sub (the Celery broker uses CELERY_BROKER_URL).
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Background jobs. Separate Redis databases keep queues, results and cache apart.
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+    heartbeat_interval_seconds: float = Field(default=60, ge=5)
+    # Longer than the longest background task (6 h default); see celery_app.py.
+    task_visibility_timeout_seconds: int = Field(default=6 * 3600, ge=60)
+    # Seconds a readiness check may wait for a dependency before calling it unavailable.
+    dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

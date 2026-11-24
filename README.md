@@ -44,7 +44,7 @@ Requirements: Node 24, pnpm 9, Python 3.13, uv, Docker, jq (used by the Claude C
 ```bash
 cp .env.example .env          # fill in values; never commit .env
 pnpm install                  # TypeScript workspace tooling
-docker compose -f infra/docker-compose.dev.yml up -d   # Postgres + TimescaleDB, Redis
+pnpm infra:up                 # Postgres + TimescaleDB + pgvector, Redis (Docker)
 pnpm lint && pnpm typecheck && pnpm test
 ```
 
