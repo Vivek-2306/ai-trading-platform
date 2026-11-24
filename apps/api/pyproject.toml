@@ -24,6 +24,22 @@ dependencies = [
 package = false
 
 [dependency-groups]
+ai = [
+    "anthropic>=2.13.0",
+    "pgvector>=0.5.1",
+    "voyageai>=0.6.0",
+]
+analysis = [
+    "exchange-calendars>=4.13.3",
+    "numpy>=2.5.5",
+    "pandas>=3.1.1",
+    "polars>=2.1.0",
+    "quantstats>=0.0.86",
+    "scipy>=1.18.1",
+    "statsmodels>=0.15.0",
+    "ta-lib>=0.8.3.post1",
+    "vectorbt>=1.2.1",
+]
 dev = [
     "celery-types>=0.26.0",
     "httpx2>=2.16.2",
@@ -33,6 +49,27 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.6",
     "testcontainers[postgres,redis]>=4.15.0",
+]
+markets = [
+    "alpaca-py>=0.45.0",
+    "ccxt>=4.5.94",
+    "feedparser>=6.0.14",
+    "finnhub-python>=2.4.30",
+    "fredapi>=0.5.2",
+    "kiteconnect>=5.2.2",
+    "polygon-api-client>=0.2.11",
+    "pysocks>=1.7.1",
+    "python-telegram-bot>=22.8",
+    "tenacity>=9.2.1",
+    "trafilatura>=2.1.0",
+    "websockets>=17.4",
+]
+ml = [
+    "lightgbm>=4.7.0",
+    "mlflow-skinny>=3.18.0",
+    "optuna>=5.1.0",
+    "scikit-learn>=1.9.1",
+    "shap>=0.54.1",
 ]
 
 [tool.ruff]

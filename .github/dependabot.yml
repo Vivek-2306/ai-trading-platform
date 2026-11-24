@@ -1,0 +1,38 @@
+# Weekly update PRs for every ecosystem. They target develop and run the normal CI.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /apps/api
+    target-branch: develop
+    schedule: { interval: weekly }
+    cooldown: { default-days: 7 }  # skip releases less than a week old
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+        # numpy/numba/vectorbt must move together; keep them out of the bulk PR.
+        exclude-patterns: [numpy, numba, vectorbt, pandas, ta-lib]
+
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      js-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker
+    directory: /apps/api
+    target-branch: develop
+    schedule: { interval: weekly }
+
+  - package-ecosystem: docker-compose
+    directory: /infra
+    target-branch: develop
+    schedule: { interval: weekly }
