@@ -6,6 +6,10 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-24
+
+First release: the complete project setup. There are no trading features yet.
+
 ### Added
 
 - Production Compose stack for one server (web, API, worker, beat, database, Redis, Caddy with automatic HTTPS), web Docker image, `infra/prod.env.example` (AITP-32).
