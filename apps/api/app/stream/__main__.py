@@ -2,6 +2,7 @@
 
 import asyncio
 import signal
+from datetime import UTC, datetime, timedelta
 
 import ccxt.pro as ccxtpro
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -12,6 +13,8 @@ from app.core.logging import configure_logging, get_logger
 from app.core.redis import create_redis
 from app.data.adapters.base import RawCandle
 from app.data.adapters.binance import BinanceAdapter
+from app.data.aggregates import refresh_aggregates
+from app.data.backfill import backfill
 from app.data.models import Timeframe
 from app.data.repository import get_or_create_instrument, insert_candles
 from app.data.universe import default_universe
@@ -24,6 +27,8 @@ from app.stream.writer import CandleWriter
 logger = get_logger(__name__)
 
 HEAL_LOOKBACK_DAYS = 1
+RECHECK_MINUTES = 10
+HEAL_REFRESH_DAYS = 30
 
 
 async def run() -> None:
@@ -49,19 +54,46 @@ async def run() -> None:
     writer = CandleWriter(redis, persist)
     rest = BinanceAdapter()
 
+    async def rest_sink(spec_id: int, candles: list[RawCandle]) -> int:
+        async with sessions() as session:
+            return await insert_candles(session, spec_id, Timeframe.M1, candles, overwrite=True)
+
     async def heal() -> None:
-        # Refetch the last day of 1m candles over REST and fill any holes.
+        """Repair the last day over REST (authoritative): fill holes, and re-check the newest
+        minutes, which the stream may have stored before their final values arrived."""
+        changed = 0
         for spec in specs:
-            result = await update_instrument(
-                sessions, rest, spec, Timeframe.M1, lookback_days=HEAL_LOOKBACK_DAYS
-            )
-            logger.info(
-                "stream_gap_heal",
-                symbol=spec.symbol,
-                new=result.new,
-                gaps_found=result.gaps_found,
-                gaps_refilled=result.gaps_refilled,
-            )
+            try:
+                result = await update_instrument(
+                    sessions, rest, spec, Timeframe.M1, lookback_days=HEAL_LOOKBACK_DAYS
+                )
+
+                async def sink(
+                    candles: list[RawCandle], sid: int = instrument_ids[spec.symbol]
+                ) -> int:
+                    return await rest_sink(sid, candles)
+
+                recheck = await backfill(
+                    rest,
+                    spec.symbol,
+                    Timeframe.M1,
+                    datetime.now(UTC) - timedelta(minutes=RECHECK_MINUTES),
+                    sink,
+                )
+                changed += result.new + recheck
+                logger.info(
+                    "stream_gap_heal",
+                    symbol=spec.symbol,
+                    new=result.new,
+                    corrected=recheck,
+                    gaps_found=result.gaps_found,
+                    gaps_refilled=result.gaps_refilled,
+                )
+            except Exception:
+                # One failing instrument must not stop the others from being healed.
+                logger.exception("stream_gap_heal_failed", symbol=spec.symbol)
+        if changed:
+            await refresh_aggregates(engine, days=HEAL_REFRESH_DAYS)
 
     healer = GapHealer(heal)
     service = StreamService(

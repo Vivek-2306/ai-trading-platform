@@ -4,6 +4,7 @@ import asyncio
 import json
 from typing import Any
 
+import anyio
 import pytest
 from fastapi.testclient import TestClient
 
@@ -131,3 +132,52 @@ async def test_payload_is_passed_through_unchanged(payload: str) -> None:
     chunks = await _collect(FakeRedis([payload]), checks=1)
 
     assert chunks == [f"event: candle\ndata: {payload}\n\n"]
+
+
+async def test_conflation_keeps_the_final_update_of_each_minute() -> None:
+    messages = [
+        '{"ts": "10:00", "close": "1"}',
+        '{"ts": "10:00", "close": "2"}',  # the final value of minute 10:00
+        '{"ts": "10:01", "close": "3"}',
+        '{"ts": "10:01", "close": "4"}',
+    ]
+
+    chunks = await _collect(FakeRedis(messages), checks=1)
+
+    assert chunks == [
+        'event: candle\ndata: {"ts": "10:00", "close": "2"}\n\n',
+        'event: candle\ndata: {"ts": "10:01", "close": "4"}\n\n',
+    ]
+
+
+class SlowCleanupPubSub(FakePubSub):
+    """Cleanup that really suspends, as a network round trip does."""
+
+    async def unsubscribe(self, channel: str) -> None:
+        await asyncio.sleep(0.02)
+        self.unsubscribed = True
+
+    async def aclose(self) -> None:
+        await asyncio.sleep(0.02)
+        self.closed = True
+
+
+async def test_cleanup_finishes_even_when_the_request_scope_is_cancelled() -> None:
+    redis = FakeRedis([])
+    redis.pubsub_obj = SlowCleanupPubSub([])
+
+    async def consume() -> None:
+        async for _ in candle_events(
+            redis,  # type: ignore[arg-type]
+            "BTC/USDT",
+            _disconnect_after(10_000),
+            poll_seconds=0.001,
+        ):
+            pass
+
+    async with anyio.create_task_group() as group:  # what Starlette does when a client leaves
+        group.start_soon(consume)
+        await asyncio.sleep(0.05)
+        group.cancel_scope.cancel()
+
+    assert redis.pubsub_obj.unsubscribed and redis.pubsub_obj.closed

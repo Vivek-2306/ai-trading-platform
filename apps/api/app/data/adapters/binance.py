@@ -52,12 +52,16 @@ class BinanceAdapter:
         clock: Callable[[], datetime] = _now,
         attempts: int = 5,
         max_wait_seconds: float = 30.0,
+        settle_seconds: float = 5.0,
     ) -> None:
         # ccxt's own rate limiter spaces requests out; retries cover what slips through.
         self._exchange = exchange or ccxt.binance({"enableRateLimit": True})
         self._clock = clock
         self._attempts = attempts
         self._max_wait = max_wait_seconds
+        # A candle counts as closed only this long after its end: our clock may run ahead of
+        # the exchange's, and the exchange needs a moment to finalise the last trades.
+        self._settle = settle_seconds
 
     async def fetch_candles(
         self, symbol: str, timeframe: Timeframe, since: datetime | None = None, limit: int = 500
@@ -87,7 +91,7 @@ class BinanceAdapter:
         candles: list[RawCandle] = []
         for row in rows:
             candle = ohlcv_row_to_candle(row)
-            if (now - candle.ts).total_seconds() < timeframe.seconds:
+            if (now - candle.ts).total_seconds() < timeframe.seconds + self._settle:
                 continue  # still forming
             candles.append(candle)
         return sorted(candles, key=lambda candle: candle.ts)

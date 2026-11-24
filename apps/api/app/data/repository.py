@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,9 +30,18 @@ async def get_or_create_instrument(session: AsyncSession, spec: InstrumentSpec) 
 
 
 async def insert_candles(
-    session: AsyncSession, instrument_id: int, timeframe: Timeframe, candles: Sequence[RawCandle]
+    session: AsyncSession,
+    instrument_id: int,
+    timeframe: Timeframe,
+    candles: Sequence[RawCandle],
+    *,
+    overwrite: bool = False,
 ) -> int:
-    """Store candles, skipping ones already present. Returns how many were new."""
+    """Store candles. Returns how many rows were written.
+
+    By default candles already present are kept. With `overwrite=True` (used for REST data,
+    which is authoritative) an existing candle whose values differ is corrected.
+    """
     inserted = 0
     for start in range(0, len(candles), _WRITE_CHUNK):
         rows = [
@@ -48,7 +57,17 @@ async def insert_candles(
             }
             for candle in candles[start : start + _WRITE_CHUNK]
         ]
-        result = await session.execute(insert(Candle).values(rows).on_conflict_do_nothing())
+        statement = insert(Candle).values(rows)
+        if overwrite:
+            changed = {c: statement.excluded[c] for c in ("open", "high", "low", "close", "volume")}
+            statement = statement.on_conflict_do_update(
+                index_elements=["instrument_id", "timeframe", "ts"],
+                set_=changed,
+                where=or_(*(getattr(Candle, c) != statement.excluded[c] for c in changed)),
+            )
+        else:
+            statement = statement.on_conflict_do_nothing()
+        result = await session.execute(statement)
         inserted += result.rowcount  # type: ignore[attr-defined]
     await session.commit()
     return inserted

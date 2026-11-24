@@ -52,7 +52,7 @@ async def _backfill(venue: str, symbol: str, asset_class: str, timeframe: str, y
 
         async def sink(candles: list[RawCandle]) -> int:
             async with sessions() as session:
-                return await insert_candles(session, instrument_id, tf, candles)
+                return await insert_candles(session, instrument_id, tf, candles, overwrite=True)
 
         return await backfill(adapter, symbol, tf, years_ago(years), sink)
     finally:

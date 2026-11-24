@@ -26,7 +26,7 @@ export function LiveChart({
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-2 sm:px-0">
-        <div aria-live="polite" className="text-lg font-semibold tabular-nums">
+        <div className="text-lg font-semibold tabular-nums">
           {last !== undefined ? last.toLocaleString("en-US", { maximumFractionDigits: 8 }) : "—"}
           <span className="ml-2 text-sm font-normal text-muted">{symbol}</span>
         </div>

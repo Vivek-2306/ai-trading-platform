@@ -149,13 +149,15 @@ async def candles(
 async def _five_minute_candles(
     session: SessionDep, instrument_id: int, limit: int, before: datetime | None
 ) -> CandlesResponse:
-    """5-minute candles are built from the 1-minute ones (a database aggregate). Only complete
-    buckets (all five 1-minute candles present) are returned."""
+    """5-minute candles are built from the 1-minute ones (a database aggregate). Only buckets
+    that have ended (a minute ago or earlier) are returned. A quiet market can have minutes
+    with no trades and so no 1-minute candle; those buckets are still returned."""
     rows = (
         await session.execute(
             text(
                 "SELECT bucket, open, high, low, close, volume FROM candles_5m_agg "
-                "WHERE instrument_id = :id AND candles = 5 "
+                "WHERE instrument_id = :id "
+                "AND bucket + INTERVAL '5 minutes' <= now() - INTERVAL '1 minute' "
                 "AND (CAST(:before AS timestamptz) IS NULL "
                 "OR bucket < CAST(:before AS timestamptz)) "
                 "ORDER BY bucket DESC LIMIT :limit"

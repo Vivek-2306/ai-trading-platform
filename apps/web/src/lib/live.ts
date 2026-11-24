@@ -42,3 +42,30 @@ export function applyLive(
     close: live.close,
   };
 }
+
+/**
+ * The candle of size `seconds` that is still forming, built from the 5-minute candles that
+ * have already closed inside the current period. The stored candles are closed ones only, so
+ * without this the first live update of a period would draw a candle that spans one minute.
+ * Returns null if the current period has no closed 5-minute candle yet, or is already stored.
+ */
+export function formingCandle(
+  fiveMinute: ChartCandle[],
+  lastClosedTime: number | undefined,
+  seconds: number,
+): ChartCandle | null {
+  const newest = fiveMinute[fiveMinute.length - 1];
+  if (!newest) return null;
+  const start = Math.floor(newest.time / seconds) * seconds;
+  if (lastClosedTime !== undefined && start <= lastClosedTime) return null;
+  const inside = fiveMinute.filter((c) => c.time >= start);
+  const first = inside[0];
+  if (!first) return null;
+  return {
+    time: start,
+    open: first.open,
+    high: Math.max(...inside.map((c) => c.high)),
+    low: Math.min(...inside.map((c) => c.low)),
+    close: newest.close,
+  };
+}

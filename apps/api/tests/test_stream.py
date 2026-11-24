@@ -145,3 +145,51 @@ def test_is_fresh() -> None:
     assert not is_fresh((now + timedelta(seconds=300)).isoformat(), now)  # from the future
     assert not is_fresh(None, now)
     assert not is_fresh("garbage", now)
+
+
+async def test_a_failing_store_is_survived_and_asks_for_a_repair() -> None:
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    repairs = 0
+    handled = 0
+    drained = asyncio.Event()
+
+    def on_reconnect() -> None:
+        nonlocal repairs
+        repairs += 1
+
+    async def handler(symbol: str, rows: Rows) -> None:
+        nonlocal handled
+        handled += 1
+        if handled == 1:
+            raise RedisConnectionError("redis blip")
+
+    service = StreamService(
+        ScriptedExchange([ROWS, ROWS, ROWS], drained),
+        ["BTC/USDT"],
+        handler,
+        on_reconnect=on_reconnect,
+    )
+    task = asyncio.create_task(service.run())
+    await asyncio.wait_for(drained.wait(), 2)
+    service.stop()
+    await asyncio.wait_for(task, 2)
+
+    assert handled == 3  # kept going after the failure
+    assert repairs == 1
+
+
+async def test_a_stalled_stream_raises_so_the_container_restarts() -> None:
+    from app.stream.service import StreamStalledError
+
+    class Silent:
+        async def watch_ohlcv(self, symbol: str, timeframe: str) -> Rows:
+            await asyncio.sleep(3600)
+            return []
+
+    service = StreamService(Silent(), ["BTC/USDT"], _noop_handler, stall_seconds=0.05)
+
+    with pytest.raises(ExceptionGroup) as info:
+        await asyncio.wait_for(service.run(), 2)
+
+    assert info.group_contains(StreamStalledError)

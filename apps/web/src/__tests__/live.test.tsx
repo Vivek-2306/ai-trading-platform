@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LiveChart } from "@/components/live-chart";
-import { applyLive, parseLiveCandle } from "@/lib/live";
+import { applyLive, formingCandle, parseLiveCandle } from "@/lib/live";
 
 const HOUR = 3600;
 const at = (iso: string) => Math.floor(Date.parse(iso) / 1000);
@@ -74,7 +74,8 @@ describe("applyLive", () => {
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
-  onopen: (() => void) | null = null;
+  readyState = 1;
+  static CLOSED = 2;
   onerror: (() => void) | null = null;
   listeners = new Map<string, (e: MessageEvent<string>) => void>();
   closed = false;
@@ -113,14 +114,12 @@ describe("LiveChart", () => {
     expect(source?.url).toBe("/api/data/stream?symbol=BTC%2FUSDT");
     expect(screen.getByText("Connecting…")).toBeInTheDocument();
 
-    act(() => source?.onopen?.());
-    expect(screen.getByText("Live")).toBeInTheDocument();
-
     act(() =>
       source?.emit(
         JSON.stringify({ ts: "2026-01-01T10:00:00Z", open: "1", high: "9", low: "1", close: "7" }),
       ),
     );
+    expect(screen.getByText("Live")).toBeInTheDocument();
     expect(screen.getByTestId("chart")).toHaveTextContent("live close: 7");
     expect(screen.getByText("7")).toBeInTheDocument();
 
@@ -138,5 +137,38 @@ describe("LiveChart", () => {
     render(<LiveChart data={data} timeframe="1d" symbol="XAU/USD" streamed={false} />);
     expect(FakeEventSource.instances).toHaveLength(0);
     expect(screen.getByText("No live feed for this instrument")).toBeInTheDocument();
+  });
+});
+
+describe("formingCandle", () => {
+  const five = (iso: string, o: number, h: number, l: number, c: number) => ({
+    time: at(iso),
+    open: o,
+    high: h,
+    low: l,
+    close: c,
+  });
+  const lastClosed = at("2026-01-01T13:00:00Z");
+
+  it("builds the current hour from the closed 5-minute candles inside it", () => {
+    const candles = [
+      five("2026-01-01T13:55:00Z", 1, 2, 1, 2), // belongs to the previous hour
+      five("2026-01-01T14:00:00Z", 10, 12, 9, 11),
+      five("2026-01-01T14:05:00Z", 11, 15, 10, 14),
+      five("2026-01-01T14:10:00Z", 14, 14.5, 8, 9),
+    ];
+    expect(formingCandle(candles, lastClosed, HOUR)).toEqual({
+      time: at("2026-01-01T14:00:00Z"),
+      open: 10,
+      high: 15,
+      low: 8,
+      close: 9,
+    });
+  });
+
+  it("returns null when that period is already stored or has no closed 5-minute candle", () => {
+    const candles = [five("2026-01-01T13:55:00Z", 1, 2, 1, 2)];
+    expect(formingCandle(candles, at("2026-01-01T13:00:00Z"), HOUR)).toBeNull();
+    expect(formingCandle([], lastClosed, HOUR)).toBeNull();
   });
 });

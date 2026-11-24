@@ -48,11 +48,11 @@ def create_celery(settings: Settings) -> Celery:
                 "task": "app.worker.tasks.heartbeat",
                 "schedule": settings.heartbeat_interval_seconds,
             },
-            # Two minutes past each hour, once the exchange has published the closed candle.
             "candle-retention": {
                 "task": "app.worker.tasks.apply_candle_retention",
                 "schedule": crontab(hour=3, minute=30),
             },
+            # Two minutes past each hour, once the exchange has published the closed candle.
             "update-candles": {
                 "task": "app.worker.tasks.update_candles",
                 "schedule": crontab(minute=2),

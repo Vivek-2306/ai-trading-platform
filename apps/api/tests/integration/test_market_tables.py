@@ -673,7 +673,12 @@ def test_five_minute_candles_come_from_the_aggregate(postgres_url: str, redis_ur
             "/data/candles", params={"instrument_id": instrument_id, "timeframe": "5m"}
         ).json()
 
-    assert [c["ts"][:16] for c in body["candles"]] == ["2026-02-03T09:00", "2026-02-03T09:05"]
+    # Ended buckets are returned even when a quiet market left a minute without a candle.
+    assert [c["ts"][:16] for c in body["candles"]] == [
+        "2026-02-03T09:00",
+        "2026-02-03T09:05",
+        "2026-02-03T09:10",
+    ]
     first = body["candles"][0]
     assert (first["open"], first["high"], first["low"], first["close"], first["volume"]) == (
         "10.0000000000",
@@ -681,7 +686,7 @@ def test_five_minute_candles_come_from_the_aggregate(postgres_url: str, redis_ur
         "9.0000000000",
         "15.0000000000",
         "5.0000000000",
-    )  # the partial 09:10 bucket is not returned
+    )
 
 
 def test_sse_stream_relays_published_candles_and_cleans_up(
@@ -746,3 +751,84 @@ def test_sse_stream_relays_published_candles_and_cleans_up(
     assert events == ['{"close": "1"}', '{"close": "2"}']
     assert released
     assert subscribers == 0
+
+
+def test_rest_overwrite_corrects_a_candle_but_the_default_keeps_it(postgres_url: str) -> None:
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    ts = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
+
+    def candle(close: str) -> RawCandle:
+        return RawCandle(ts, Decimal(1), Decimal(5), Decimal(1), Decimal(close), Decimal(2))
+
+    async def work(session: AsyncSession) -> tuple[int, int, int, int, Decimal]:
+        spec = InstrumentSpec("binance", "ATOM/USDT", AssetClass.CRYPTO)
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        first = await insert_candles(session, iid, Timeframe.M1, [candle("2")])
+        kept = await insert_candles(session, iid, Timeframe.M1, [candle("3")])  # default: keep
+        same = await insert_candles(session, iid, Timeframe.M1, [candle("2")], overwrite=True)
+        fixed = await insert_candles(session, iid, Timeframe.M1, [candle("4")], overwrite=True)
+        close = (
+            await session.execute(select(Candle.close).where(Candle.instrument_id == iid))
+        ).scalar_one()
+        return first, kept, same, fixed, close
+
+    first, kept, same, fixed, close = _run(postgres_url, work)
+    assert (first, kept, same, fixed) == (1, 0, 0, 1)  # unchanged rows are not rewritten
+    assert close == Decimal(4)
+
+
+def test_refresh_aggregates_materializes_old_minutes(postgres_url: str) -> None:
+    from sqlalchemy import insert as core_insert
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
+    from app.data.aggregates import refresh_aggregates
+    from app.data.models import AssetClass
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    now = datetime(2026, 6, 10, 12, 0, tzinfo=UTC)
+    old = now - timedelta(days=5)  # outside the policy's 2-day window
+
+    async def work(session: AsyncSession) -> int:
+        iid = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "NEAR/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        await session.commit()
+        rows = [
+            {
+                "instrument_id": iid,
+                "timeframe": "1m",
+                "ts": old + timedelta(minutes=i),
+                "open": Decimal(1),
+                "high": Decimal(2),
+                "low": Decimal(1),
+                "close": Decimal(2),
+                "volume": Decimal(1),
+            }
+            for i in range(10)
+        ]
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        engine = session.bind
+        assert isinstance(engine, AsyncEngine)
+        await refresh_aggregates(engine, days=30, now=now)
+        # Materialized-only view of the aggregate: the buckets are stored, not just computed.
+        count = await session.execute(
+            text(
+                "SELECT count(*) FROM candles_5m_agg WHERE instrument_id = :i "
+                "AND bucket >= :s AND bucket < :e"
+            ),
+            {"i": iid, "s": old, "e": old + timedelta(hours=1)},
+        )
+        return int(count.scalar_one())
+
+    assert _run(postgres_url, work) == 2

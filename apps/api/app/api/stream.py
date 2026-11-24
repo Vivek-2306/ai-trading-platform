@@ -6,13 +6,16 @@ relays them. Each message is the full latest candle, so when a client is slow we
 ones in between and send only the newest (nothing piles up in memory).
 """
 
+import json
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Annotated
 
+import anyio
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from redis.asyncio import Redis
+from starlette.background import BackgroundTask
 
 from app.core.logging import get_logger
 from app.core.redis import RedisDep
@@ -31,6 +34,13 @@ VENUE = "binance"
 def _event(data: str | bytes) -> str:
     text = data.decode() if isinstance(data, bytes) else data
     return f"event: candle\ndata: {text}\n\n"
+
+
+def _candle_time(data: str | bytes) -> str:
+    try:
+        return str(json.loads(data).get("ts", ""))
+    except (ValueError, AttributeError):
+        return ""
 
 
 async def candle_events(
@@ -52,19 +62,25 @@ async def candle_events(
         last_sent = time.monotonic()
         while not await is_disconnected():
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=poll_seconds)
-            latest = None
-            while message is not None:  # drain what is already waiting; keep only the newest
-                latest = message["data"]
+            # Drain what is already waiting and keep the newest message per candle: a slow
+            # client skips intermediate updates but still gets each minute's final one.
+            newest: dict[str, str | bytes] = {}
+            while message is not None:
+                newest[_candle_time(message["data"])] = message["data"]
                 message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0)
-            if latest is not None:
-                yield _event(latest)
+            if newest:
+                for data in newest.values():
+                    yield _event(data)
                 last_sent = time.monotonic()
             elif time.monotonic() - last_sent >= keepalive_seconds:
                 yield ": keepalive\n\n"
                 last_sent = time.monotonic()
     finally:
-        await pubsub.unsubscribe(channel)
-        await pubsub.aclose()
+        # A disconnect cancels this generator; shield the cleanup so the Redis subscription
+        # and connection are really released.
+        with anyio.CancelScope(shield=True):
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
 
 
 @router.get(
@@ -91,17 +107,25 @@ async def stream(
     state = request.app.state
     if getattr(state, "stream_clients", 0) >= MAX_CLIENTS:
         raise HTTPException(status_code=503, detail="Too many open streams")
+    state.stream_clients = getattr(state, "stream_clients", 0) + 1  # reserve the slot now
+    released = False
+
+    def release() -> None:
+        nonlocal released
+        if not released:
+            released = True
+            state.stream_clients -= 1
 
     async def body() -> AsyncIterator[str]:
-        state.stream_clients = getattr(state, "stream_clients", 0) + 1
         try:
             async for chunk in candle_events(redis, symbol, request.is_disconnected):
                 yield chunk
         finally:
-            state.stream_clients -= 1
+            release()
 
     return StreamingResponse(
         body(),
+        background=BackgroundTask(release),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )
