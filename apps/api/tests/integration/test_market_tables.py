@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -20,6 +21,15 @@ pytestmark = pytest.mark.integration
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
+
+
+def _risk(action: str) -> dict[str, object]:
+    """A risk record as the veto layer writes it (a BUY must carry its plan and size)."""
+    record: dict[str, object] = {"assessed": True, "vetoes": []}
+    if action == "BUY":
+        record["plan"] = {"entry": "100", "stop": "97", "target": "106"}
+        record["size"] = {"quantity": "1"}
+    return record
 
 
 def _migrate(url: str) -> None:
@@ -854,6 +864,7 @@ def test_signals_are_append_only(postgres_url: str) -> None:
             reasons=[{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
             inputs={"rsi": 25.0},
             rule_version="rules-v1",
+            risk=_risk(action),
         )
 
     async def work(session: AsyncSession) -> dict[str, object]:
@@ -912,6 +923,7 @@ def test_signals_are_append_only(postgres_url: str) -> None:
             "reasons": s.reasons,
             "inputs": s.inputs,
             "rule_version": s.rule_version,
+            "risk": s.risk,
         }
 
     out = _run(postgres_url, work)
@@ -1060,6 +1072,7 @@ def test_signals_endpoints_filter_page_and_show_latest(postgres_url: str, redis_
             reasons=[{"code": "trend_up", "text": "Uptrend.", "direction": "buy", "weight": 2.0}],
             inputs={"rsi": 55.0},
             rule_version="rules-v1",
+            risk=_risk(action),
         )
 
     async def seed(session: AsyncSession) -> tuple[int, int]:
@@ -1307,3 +1320,135 @@ def test_kill_switch_api_on_is_open_off_needs_the_token(
     finally:
         monkeypatch.delenv("RISK_ADMIN_TOKEN")
         get_risk_limits.cache_clear()
+
+
+def test_the_runner_stores_the_post_veto_action_and_the_database_refuses_a_bare_buy(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+    from sqlalchemy.exc import IntegrityError
+
+    from app.data.models import AssetClass, SignalAction, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.risk.killswitch import set_kill_switch
+    from app.signals import runner
+    from app.signals.rules import Decision, Reason
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(11)
+    start = datetime(2026, 11, 1, tzinfo=UTC)
+    spec = InstrumentSpec("binance", "RISKTEST/USDT", AssetClass.CRYPTO)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        price = 100.0
+        rows = []
+        for i in range(120):
+            price *= 1 + rng.normal(0, 0.01)
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+    now = start + timedelta(hours=120, minutes=10)
+
+    def buy_decision(features: object, config: object = None) -> Decision:
+        return Decision(
+            SignalAction.BUY,
+            Decimal("0.8"),
+            [Reason("trend_up", "Uptrend.", "buy", 2.0)],
+            {"atr": 1.2, "close": 100.0, "rsi": 55.0},
+        )
+
+    monkeypatch.setattr(runner, "evaluate", buy_decision)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        out: dict[str, object] = {}
+        await runner.run_signal(sessions, spec, Timeframe.H1, now=now)
+        row = (
+            await session.execute(
+                text("SELECT action, risk, reasons FROM signals WHERE instrument_id = :i"),
+                {"i": iid},
+            )
+        ).one()
+        out["buy"] = (row.action, row.risk, [r["code"] for r in row.reasons])
+
+        # Kill switch on: the next candle's signal must come out as NO_TRADE.
+        await set_kill_switch(session, active=True, actor="test", reason="integration test")
+        later = now + timedelta(hours=1)
+        await session.execute(  # one more candle so there is a new signal to make
+            core_insert(Candle),
+            [
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=120),
+                    "open": Decimal(100),
+                    "high": Decimal(101),
+                    "low": Decimal(99),
+                    "close": Decimal(100),
+                    "volume": Decimal(5),
+                }
+            ],
+        )
+        await session.commit()
+        await runner.run_signal(sessions, spec, Timeframe.H1, now=later)
+        killed = (
+            await session.execute(
+                text(
+                    "SELECT action, risk, reasons FROM signals WHERE instrument_id = :i "
+                    "ORDER BY candle_ts DESC LIMIT 1"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        out["killed"] = (
+            killed.action,
+            killed.risk["kill_switch"],
+            killed.risk["rules_action"],
+            [r["code"] for r in killed.reasons],
+        )
+        await set_kill_switch(session, active=False, actor="test", reason="integration test done")
+
+        # The database itself refuses a BUY that carries no plan, whoever writes it.
+        try:
+            await session.execute(
+                text(
+                    "INSERT INTO signals (instrument_id, timeframe, candle_ts, action, confidence, "
+                    "reasons, inputs, rule_version, risk) VALUES (:i, '1h', now(), 'BUY', 0.9, "
+                    "'[]'::jsonb, '{}'::jsonb, 'x', '{}'::jsonb)"
+                ),
+                {"i": iid},
+            )
+            await session.commit()
+            out["bare_buy"] = "accepted"
+        except IntegrityError:
+            await session.rollback()
+            out["bare_buy"] = "refused"
+        return out
+
+    out: dict[str, Any] = _run(postgres_url, work)
+    action, risk, codes = out["buy"]
+    assert action == "BUY" and risk["assessed"] is True
+    assert risk["plan"]["entry"] and risk["plan"]["stop"] and risk["size"]["quantity"]
+    assert "risk_plan" in codes  # the human-readable plan is part of the reasons
+    killed_action, kill_flag, rules_action, killed_codes = out["killed"]
+    assert (killed_action, kill_flag, rules_action) == ("NO_TRADE", True, "BUY")
+    assert "risk_kill_switch" in killed_codes
+    assert out["bare_buy"] == "refused"

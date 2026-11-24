@@ -39,6 +39,11 @@ class Signal(Base):
         ),
         CheckConstraint("action IN ('BUY', 'SELL', 'HOLD', 'NO_TRADE')", name="action_known"),
         CheckConstraint("confidence >= 0 AND confidence <= 1", name="confidence_in_range"),
+        # A BUY must carry the risk engine's plan and size (see app.risk.veto).
+        CheckConstraint(
+            "action <> 'BUY' OR (risk ? 'plan' AND risk ? 'size' AND risk ->> 'assessed' = 'true')",
+            name="buy_has_plan",
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -55,4 +60,6 @@ class Signal(Base):
     # The feature values the decision was based on, for audit.
     inputs: Mapped[dict[str, Any]] = mapped_column(JSONB)
     rule_version: Mapped[str] = mapped_column(String(32))
+    # The risk veto's record: plan, size, vetoes, limits. {} for signals before the risk engine.
+    risk: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

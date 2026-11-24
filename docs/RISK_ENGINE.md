@@ -33,3 +33,39 @@ be vetoed) and a per-trade risk above the daily loss limit.
 2. **Size** (`app/risk/sizing.py`): quantity = (capital x risk%) / (entry - stop), limited to the
    capital-share cap, rounded down to the instrument's lot size. The real risk and exposure never
    exceed the limits.
+3. **Limits:** no new BUY when the open-position limit is reached or today's realised losses
+   reached the daily loss limit. (There are no paper trades yet, so these inputs are empty until
+   Phase 12; the checks are tested and live.)
+4. **Veto:** anything refused becomes **NO TRADE** with every reason. SELL, HOLD and NO TRADE pass
+   through unchanged. The stored signal keeps what the rules said (`rules_action`) next to the
+   final action, the plan, the size, the vetoes and a snapshot of the limits.
+
+## Nothing skips the veto
+
+- A signal is built only by `to_signal` in `app/signals/runner.py`, which needs a `RiskAssessment`.
+  A `RiskAssessment` can only be created by `assess()`.
+- `record_signal` refuses a signal without an assessment, and a BUY without its plan and size.
+- The database refuses a BUY row without them too (`ck_signals_buy_has_plan`).
+- `tests/test_risk_bypass.py` fails if any other module touches the Signal model, calls
+  `record_signal`, or writes to the signals table with raw SQL.
+
+## Kill switch
+
+One switch that makes every signal NO TRADE. State is an append-only audit log in the database
+(who, when, why), so it survives restarts.
+
+```bash
+cd apps/api
+uv run python -m app.risk.killswitch status
+uv run python -m app.risk.killswitch on  --reason "exchange outage"
+uv run python -m app.risk.killswitch off --reason "checked, all clear"
+```
+
+API: `GET /risk/status`, `POST /risk/kill-switch {"active": true, "reason": "..."}`. Switching ON
+needs nothing. Switching OFF needs `RISK_ADMIN_TOKEN` in the `X-Admin-Token` header, and is refused
+when no token is configured (then use the command line). The web proxy does not forward `/risk`.
+
+## Not built yet
+
+Orders and any broker (Phase 12+), real open-position and daily-loss numbers (Phase 12), shorting,
+leverage, and per-instrument limits.
