@@ -4,8 +4,10 @@
 
 ## Current phase
 
-**v0.1.0 released 2026-11-24** (setup phases 1–6, PRs #1–#6, #12–#14). Feature phases 7 to 9b are
-planned in `docs/PLAN.md` (ADR 0003); none started. See `docs/SETUP_REPORT.md`.
+**Phase 7 — Crypto and gold market data** on `phase-7-market-data` (AITP-41 … 48). v0.1.0 released
+2026-11-24. Later feature phases (7b, 8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
+Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike + adapter, 44 backfill job,
+45 incremental updates + gap refill, 46 data-quality checks, 47 API endpoints, 48 web price chart.
 
 ## Last completed
 
