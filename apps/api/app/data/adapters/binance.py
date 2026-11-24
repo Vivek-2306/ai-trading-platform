@@ -28,6 +28,20 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def ohlcv_row_to_candle(row: list[float]) -> RawCandle:
+    """One ccxt OHLCV row [open_time_ms, o, h, l, c, v] as an exact-decimal candle in UTC."""
+    ts_ms, o, h, low, c, v = row
+    # ccxt hands back floats parsed from Binance's decimal strings; str() round-trips.
+    return RawCandle(
+        ts=datetime.fromtimestamp(ts_ms / 1000, tz=UTC),
+        open=Decimal(str(o)),
+        high=Decimal(str(h)),
+        low=Decimal(str(low)),
+        close=Decimal(str(c)),
+        volume=Decimal(str(v)),
+    )
+
+
 class BinanceAdapter:
     venue = "binance"
 
@@ -71,21 +85,11 @@ class BinanceAdapter:
     def _closed(self, rows: list[list[float]], timeframe: Timeframe) -> list[RawCandle]:
         now = self._clock()
         candles: list[RawCandle] = []
-        for ts_ms, o, h, low, c, v in rows:
-            opened = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
-            if (now - opened).total_seconds() < timeframe.seconds:
+        for row in rows:
+            candle = ohlcv_row_to_candle(row)
+            if (now - candle.ts).total_seconds() < timeframe.seconds:
                 continue  # still forming
-            # ccxt hands back floats parsed from Binance's decimal strings; str() round-trips.
-            candles.append(
-                RawCandle(
-                    ts=opened,
-                    open=Decimal(str(o)),
-                    high=Decimal(str(h)),
-                    low=Decimal(str(low)),
-                    close=Decimal(str(c)),
-                    volume=Decimal(str(v)),
-                )
-            )
+            candles.append(candle)
         return sorted(candles, key=lambda candle: candle.ts)
 
     @staticmethod

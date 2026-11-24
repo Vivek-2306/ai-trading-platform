@@ -388,3 +388,47 @@ def test_instruments_and_candles_endpoints(postgres_url: str, redis_url: str) ->
         "2026-02-01T01",
         "2026-02-01T02",
     ]
+
+
+def test_streamed_candles_are_stored_once_even_when_replayed(postgres_url: str) -> None:
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles
+    from app.data.universe import InstrumentSpec
+    from app.stream.writer import CandleWriter
+
+    _migrate(postgres_url)
+    base = 1_795_500_000_000
+
+    def row(minute: int) -> list[float]:
+        return [float(base + minute * 60_000), 10.0, 11.0, 9.0, 10.5, 2.0]
+
+    class FakeRedis:
+        async def set(self, *_: object, **__: object) -> None: ...
+        async def publish(self, *_: object) -> None: ...
+
+    async def work(session: AsyncSession) -> int:
+        spec = InstrumentSpec("binance", "XRP/USDT", AssetClass.CRYPTO)
+        instrument = await get_or_create_instrument(session, spec)
+        await session.commit()
+        instrument_id = instrument.id
+        engine = session.bind
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+
+        async def persist(symbol: str, candles: list[RawCandle]) -> int:
+            async with sessions() as inner:
+                return await insert_candles(inner, instrument_id, Timeframe.M1, candles)
+
+        clock = {"now": 0.0}
+        for _ in range(2):  # the second pass is a restarted service replaying the same minutes
+            writer = CandleWriter(FakeRedis(), persist, clock_ms=lambda: clock["now"])  # type: ignore[arg-type]
+            for minute in range(4):
+                clock["now"] = float(base + minute * 60_000 + 60_500)  # just after each close
+                await writer.handle("XRP/USDT", [row(minute)])
+        count = await session.execute(
+            text("SELECT count(*) FROM candles WHERE instrument_id = :i AND timeframe = '1m'"),
+            {"i": instrument_id},
+        )
+        return int(count.scalar_one())
+
+    assert _run(postgres_url, work) == 3  # minutes 0, 1, 2: the forming minute 3 is not stored
