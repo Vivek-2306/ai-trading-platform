@@ -50,7 +50,9 @@ class BacktestConfig:
     timeframe: str
     strategy: str = "rules-v2"
     capital: Decimal = D("1000")
-    fee_pct: Decimal = D("0.1")  # per fill, percent of notional (Binance spot default tier)
+    fee_pct: Decimal = D("0.1")  # per market (taker) fill, percent of notional
+    # Fee for resting limit orders (the target exit). None: every fill pays fee_pct.
+    maker_fee_pct: Decimal | None = None
     slippage_bps: Decimal = D("5")  # per market fill, against you
     latency_candles: int = 0  # extra candles between the decision and the fill
     # The rest of the risk limits come from RiskLimits; only what changes results is recorded.
@@ -63,9 +65,11 @@ class BacktestConfig:
     max_stop_distance_pct: Decimal = D("10")
 
     def __post_init__(self) -> None:
+        negative_maker = self.maker_fee_pct is not None and self.maker_fee_pct < 0
         if (
             self.capital <= 0
             or self.fee_pct < 0
+            or negative_maker
             or self.slippage_bps < 0
             or self.latency_candles < 0
         ):
@@ -208,7 +212,8 @@ def run_backtest(
         assert position is not None
         fill = _slip(price, config.slippage_bps, "sell") if market else price
         proceeds = position.quantity * fill
-        fee = _fee(proceeds, config.fee_pct)
+        rate = config.maker_fee_pct if (not market and config.maker_fee_pct is not None) else None
+        fee = _fee(proceeds, config.fee_pct if rate is None else rate)
         cash += proceeds - fee
         pnl = proceeds - fee - (position.quantity * position.entry_price + position.entry_cost)
         trades.append(

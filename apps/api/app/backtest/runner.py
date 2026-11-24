@@ -36,6 +36,7 @@ MIN_OOS_CANDLES = 100  # a locked period smaller than this cannot be judged
 _DECIMAL_FIELDS = {
     "capital",
     "fee_pct",
+    "maker_fee_pct",
     "slippage_bps",
     "risk_per_trade_pct",
     "max_capital_share_pct",
@@ -61,7 +62,9 @@ def code_version() -> str:
 
 
 def config_from_dict(data: dict[str, Any]) -> BacktestConfig:
-    values: dict[str, Any] = {k: Decimal(v) if k in _DECIMAL_FIELDS else v for k, v in data.items()}
+    values: dict[str, Any] = {
+        k: Decimal(v) if k in _DECIMAL_FIELDS and v is not None else v for k, v in data.items()
+    }
     return BacktestConfig(**values)
 
 
