@@ -136,6 +136,8 @@ class BacktestResult:
     trades: list[Trade]
     first_decision_index: int
     stats: dict[str, int] = field(default_factory=dict)  # signals, vetoes, skipped fills
+    # What the strategy decided after each candle it was asked about: (candle index, action).
+    decisions: list[tuple[int, str]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -174,8 +176,14 @@ def run_backtest(
     candles: list[RawCandle],
     config: BacktestConfig,
     strategy: Strategy = default_strategy,
+    *,
+    ask_at_last: bool = False,
 ) -> BacktestResult:
-    """Replay `candles` (oldest first) through the strategy and the risk engine."""
+    """Replay `candles` (oldest first) through the strategy and the risk engine.
+
+    `ask_at_last` also asks the strategy after the final candle (there is nothing to fill at, so
+    nothing trades). The look-ahead check uses it to compare that last decision.
+    """
     if len(candles) < MIN_CANDLES + 2:
         raise ValueError(f"need at least {MIN_CANDLES + 2} candles to backtest")
     ordered = sorted(candles, key=lambda c: c.ts)
@@ -190,6 +198,7 @@ def run_backtest(
     trades: list[Trade] = []
     equity: list[Decimal] = []
     stats = {"decisions": 0, "buy_signals": 0, "vetoed": 0, "skipped_fills": 0}
+    decisions: list[tuple[int, str]] = []
     losses_by_day: dict[str, Decimal] = {}
 
     def close_position(index: int, price: Decimal, reason: str, market: bool) -> None:
@@ -282,11 +291,12 @@ def run_backtest(
         equity.append(cash + (position.quantity * candle.close if position else D(0)))
 
         # 4. After the close, the strategy decides from what it can see: candles up to i.
-        if i < MIN_CANDLES or i >= n - 1 or pending is not None:
+        if i < MIN_CANDLES or (i >= n - 1 and not ask_at_last) or pending is not None:
             continue
         view = {name: values[: i + 1] for name, values in features.items()}
         decision = strategy(view)
         stats["decisions"] += 1
+        decisions.append((i, decision.action.value))
         fill_index = i + 1 + config.latency_candles
         if fill_index >= n:
             continue
@@ -320,6 +330,7 @@ def run_backtest(
         trades=trades,
         first_decision_index=MIN_CANDLES,
         stats=stats,
+        decisions=decisions,
     )
 
 

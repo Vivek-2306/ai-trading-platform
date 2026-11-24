@@ -110,12 +110,24 @@ def compute_metrics(result: BacktestResult) -> Metrics:
         )
 
     periods = PERIODS_PER_YEAR.get(result.config.timeframe, 365.0)
+    profit_factor = float(gross_win / gross_loss) if gross_loss > 0 else None
+    sharpe = sharpe_ratio(equity, periods)
+    win_rate = len(wins) / n * 100.0 if n else None
+    if n >= 10 and (
+        (profit_factor is not None and profit_factor > 5)
+        or (sharpe is not None and sharpe > 5)
+        or (win_rate is not None and win_rate > 90)
+    ):
+        warnings.append(
+            "Too good to be true: results this strong in a backtest usually mean look-ahead, "
+            "a bug, or luck. Run the leakage check before believing them."
+        )
     return Metrics(
         trades=n,
         wins=len(wins),
         losses=len(losses),
-        win_rate_pct=len(wins) / n * 100.0 if n else None,
-        profit_factor=float(gross_win / gross_loss) if gross_loss > 0 else None,
+        win_rate_pct=win_rate,
+        profit_factor=profit_factor,
         expectancy=net / n if n else None,
         expectancy_r=float(sum((t.r_multiple for t in trades), Decimal(0)) / n) if n else None,
         avg_win=avg_win,
@@ -123,7 +135,7 @@ def compute_metrics(result: BacktestResult) -> Metrics:
         payoff_ratio=float(avg_win / -avg_loss) if avg_win and avg_loss else None,
         total_return_pct=float((final - initial) / initial * 100) if initial else 0.0,
         max_drawdown_pct=max_drawdown_pct(equity),
-        sharpe=sharpe_ratio(equity, periods),
+        sharpe=sharpe,
         exposure_pct=exposure,
         fees_paid=fees,
         gross_pnl=net + fees,
