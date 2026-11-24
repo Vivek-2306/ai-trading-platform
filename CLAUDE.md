@@ -55,6 +55,7 @@ Ticket properties: Title, ID, Status (To Do, In Progress, Blocked, Needs Decisio
 Done), Phase, Phase page (relation to Phases DB), Type, Priority, Branch, Commit, PR,
 Locked by (laptop, cloud). Acceptance criteria = to-do checklist in the ticket body; tick
 each item when it's met. Phase rows track Status, Branch, PR and Release tag.
+| Notion API Reference | https://app.notion.com/p/422426f94e2f8123b0d0e0188c8fc245 — data source `collection://422426f9-4e2f-818b-8ccd-000b0ed567a4` (one row per endpoint; Postman copy in `docs/api/`) |
 | Plan review doc | https://claude.ai/artifact/XRbXnA3USEdg7H7sZFfYgR (the `docs/` files are the source of truth) |
 
 ## Stack (approved 2026-11-23 — see docs/TECH_STACK.md, ADR 0001)
