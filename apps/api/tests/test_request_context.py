@@ -131,6 +131,9 @@ def test_request_context_is_cleared_after_request(client: TestClient) -> None:
 
 
 def test_health_probes_are_not_logged_at_info(client: TestClient) -> None:
+    client.app.state.readiness_checks.clear()  # type: ignore[attr-defined]
+    client.app.state.readiness_checks["fake"] = _up  # type: ignore[attr-defined]
+
     with capture_logs() as logs:
         client.get("/health")
         client.get("/health/ready")
@@ -151,3 +154,7 @@ def test_failing_health_probe_is_logged_at_info(client: TestClient) -> None:
 
 async def _down() -> bool:
     return False
+
+
+async def _up() -> bool:
+    return True
