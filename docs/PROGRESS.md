@@ -4,10 +4,10 @@
 
 ## Current phase
 
-**Phase 7 — Crypto and gold market data** on `phase-7-market-data` (AITP-41 … 48). v0.1.0 released
-2026-11-24. Later feature phases (7b, 8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
-Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike + adapter, 44 backfill job,
-45 incremental updates + gap refill, 46 data-quality checks, 47 API endpoints, 48 web price chart.
+**Phase 7b — Live streaming data** on `phase-7b-live-stream` (AITP-49 … 54). Phase 7 merged (PR #16).
+v0.1.0 released 2026-11-24. Later feature phases (8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
+Tickets: 49 stream service, 50 write 1m candles (Redis + TimescaleDB), 51 gap detection + REST backfill,
+52 aggregates/compression/retention, 53 live price API stream, 54 web live price on the chart.
 
 ## Last completed
 
@@ -63,12 +63,11 @@ Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike +
 
 ## In progress
 
-Phase 7 PR into `develop` (owner review).
+Phase 7b (live streaming), ticket by ticket.
 
 ## Next up
 
-1. Owner reviews and merges the Phase 7 PR; then `/release-phase 7`.
-2. Owner says "go" for Phase 7b (live streaming, `/start-phase 7b`).
+1. Phase 7b in progress; the owner reviews and merges its PR when opened.
 3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 5. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
