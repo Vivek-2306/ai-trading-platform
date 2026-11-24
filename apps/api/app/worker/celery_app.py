@@ -11,6 +11,7 @@ from celery import Celery
 from celery.signals import setup_logging
 
 from app.core.config import Settings, get_settings
+from app.core.error_reporting import init_error_reporting
 from app.core.logging import configure_logging
 
 
@@ -40,6 +41,7 @@ def create_celery(settings: Settings) -> Celery:
         result_expires=24 * 3600,
         broker_connection_retry_on_startup=True,
         worker_hijack_root_logger=False,  # keep our structlog setup
+        worker_redirect_stdouts=False,  # else structlog's stdout lines would be logged twice
         beat_schedule={
             "heartbeat": {
                 "task": "app.worker.tasks.heartbeat",
@@ -54,6 +56,7 @@ def create_celery(settings: Settings) -> Celery:
 def _use_structlog(**_: Any) -> None:
     """Route Celery's logging through our structlog configuration."""
     configure_logging(get_settings())
+    init_error_reporting(get_settings())
 
 
 celery_app = create_celery(get_settings())

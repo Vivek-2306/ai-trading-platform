@@ -4,9 +4,8 @@
 
 ## Current phase
 
-**Phase 4 — Web app skeleton** on `phase-4-web-skeleton` (AITP-18 … 23, plus AITP-36 env/logging and
-AITP-37 ngrok tunnel). Phases 1–3 merged into `develop` (PRs #1–#3).
-**Phase 4b — API reference, Postman, logging** (AITP-38 … 40) follows on `phase-4b-api-docs`.
+**Phase 4b — API reference, Postman and logging** on `phase-4b-api-docs` (AITP-38 … 40).
+Phases 1–4 merged into `develop` (PRs #1–#4).
 
 ## Last completed
 
@@ -52,17 +51,20 @@ AITP-37 ngrok tunnel). Phases 1–3 merged into `develop` (PRs #1–#3).
 - Phase 3 merged (PR #3, `892f48f`). Phase 4 started: AITP-18 Next.js 16 app in `apps/web` (strict TS, `/api/*` proxied to the API, repo-root env file loaded).
 - AITP-19 responsive glass UI shell (Tailwind v4, dark/light, bottom nav on phones), AITP-20 Biome + Vitest, AITP-21 `packages/api-client` generated from OpenAPI (CI checks it is fresh), AITP-22 live system status page (API/DB/Redis; verified Redis down → shows Down), AITP-36 validated env + pino logs + one request ID across web and API logs, AITP-37 `pnpm tunnel` (ngrok; verified from the public URL), AITP-23 web CI job. 10 web tests.
 
+- Phase 4 merged (PR #4). Phase 4b: AITP-39 Postman collection generated from OpenAPI (`pnpm api:postman`, CI checks it), AITP-38 Notion API Reference database (5 rows) + CLAUDE.md rule 12, AITP-40 log redaction, quiet health probes, optional `LOG_FILE` and `SENTRY_DSN`; 61 API tests.
+
 ## In progress
 
-Phase 4 finishing: self-review, then PR into `develop`.
+Phase 4b finishing: self-review, then PR into `develop`.
 
 ## Next up
 
-1. Owner reviews and merges the Phase 4 PR; then `/release-phase 4`.
-2. Phase 4b (AITP-38 … 40): Notion API Reference, Postman collection, logging hardening.
-3. Owner: add `API_URL=http://127.0.0.1:8000`, `POSTGRES_PORT=5432`, `REDIS_PORT=6379` to `.env.example`
-   (Claude cannot edit that file), and run `cp .env.example .env` for local use.
-4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule (it blocks harmless commands).
+1. Owner reviews and merges the Phase 4b PR; then `/release-phase 4b`.
+2. Phase 5 — domain packages (AITP-24 … 29) after the owner says "go".
+3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL=http://127.0.0.1:8000`,
+   `POSTGRES_PORT=5432`, `REDIS_PORT=6379`, `LOG_FILE=` and `SENTRY_DSN=` (both optional); then
+   `cp .env.example .env`.
+4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 
 ## Open questions (owner decisions)
 

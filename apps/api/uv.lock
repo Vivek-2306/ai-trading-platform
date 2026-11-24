@@ -847,6 +847,19 @@ wheels = [
 ]
 
 [[package]]
+name = "sentry-sdk"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/63/25/54c58ddabc95f72ca32c2188247e0bf12584c0d65e117aba212afa6b54e1/sentry_sdk-3.0.0.tar.gz", hash = "sha256:daa5f0baa931dfd8c4d6844b4992764683a1abdcbad968c76703c34f0e244f13", size = 888885, upload-time = "2026-11-23T09:30:35.104Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/4b/69643d19c9954f930a03deb06e3f80c57b2d6ecb325bdc9ca3fa1b6d1d30/sentry_sdk-3.0.0-py3-none-any.whl", hash = "sha256:22cfcdb11b494e8efa82a48edd655afdf99179df37f2ed37f18846b938455c36", size = 472979, upload-time = "2026-11-23T09:30:33.705Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -937,6 +950,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "redis" },
+    { name = "sentry-sdk" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
@@ -964,6 +978,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.14.4" },
     { name = "pydantic-settings", specifier = ">=2.16.3" },
     { name = "redis", specifier = ">=8.2.0" },
+    { name = "sentry-sdk", specifier = ">=3.0.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1.9" },
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
