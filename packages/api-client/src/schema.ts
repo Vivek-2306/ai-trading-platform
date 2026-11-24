@@ -65,6 +65,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/data/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live candle stream (SSE)
+         * @description Server-Sent Events. Each `candle` event is the forming 1-minute candle as JSON with
+         *     decimal-string prices: {"ts", "open", "high", "low", "close", "volume"}. A `: keepalive`
+         *     comment is sent every 15 seconds of silence.
+         */
+        get: operations["stream_data_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -345,6 +367,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QualityResponse"];
                 };
+            };
+        };
+    };
+    stream_data_stream_get: {
+        parameters: {
+            query: {
+                /** @description e.g. BTC/USDT */
+                symbol: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-Sent Events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Unknown symbol */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many open streams */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -488,6 +488,53 @@
         ]
       }
     },
+    "/data/stream": {
+      "get": {
+        "description": "Server-Sent Events. Each `candle` event is the forming 1-minute candle as JSON with\ndecimal-string prices: {\"ts\", \"open\", \"high\", \"low\", \"close\", \"volume\"}. A `: keepalive`\ncomment is sent every 15 seconds of silence.",
+        "operationId": "stream_data_stream_get",
+        "parameters": [
+          {
+            "description": "e.g. BTC/USDT",
+            "in": "query",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "description": "e.g. BTC/USDT",
+              "title": "Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-Sent Events"
+          },
+          "404": {
+            "description": "Unknown symbol"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Too many open streams"
+          }
+        },
+        "summary": "Live candle stream (SSE)",
+        "tags": [
+          "data"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "Returns ok while the process is up. It does not check dependencies; see /health/ready.",

@@ -682,3 +682,67 @@ def test_five_minute_candles_come_from_the_aggregate(postgres_url: str, redis_ur
         "15.0000000000",
         "5.0000000000",
     )  # the partial 09:10 bucket is not returned
+
+
+def test_sse_stream_relays_published_candles_and_cleans_up(
+    postgres_url: str, redis_url: str
+) -> None:
+    import socket
+    import threading
+    import time
+
+    import httpx
+    import uvicorn
+    from redis import Redis as SyncRedis
+
+    from app.core.config import Settings
+    from app.main import create_app
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    app = create_app(settings)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(100):
+        if server.started:
+            break
+        time.sleep(0.05)
+    assert server.started
+
+    sync_redis = SyncRedis.from_url(redis_url, decode_responses=True)
+    channel = "candles:binance:BTC/USDT:1m"
+    sync_redis.set("live:binance:BTC/USDT:1m", '{"close": "1"}')
+    events: list[str] = []
+    try:
+        with httpx.stream(
+            "GET", f"http://127.0.0.1:{port}/data/stream", params={"symbol": "BTC/USDT"}, timeout=10
+        ) as response:
+            assert response.status_code == 200
+            assert response.headers["content-type"].startswith("text/event-stream")
+            for line in response.iter_lines():
+                if line.startswith("data:"):
+                    events.append(line[5:].strip())
+                    if len(events) == 1:  # the stored latest arrived: now publish an update
+                        sync_redis.publish(channel, '{"close": "2"}')
+                    if len(events) == 2:
+                        break
+        # The client left: the server must release its slot and its Redis subscription.
+        for _ in range(60):
+            if getattr(app.state, "stream_clients", 1) == 0:
+                break
+            time.sleep(0.1)
+        released = getattr(app.state, "stream_clients", 1) == 0
+        subscribers = sync_redis.pubsub_numsub(channel)[0][1]
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+        sync_redis.delete("live:binance:BTC/USDT:1m")
+
+    assert events == ['{"close": "1"}', '{"close": "2"}']
+    assert released
+    assert subscribers == 0
