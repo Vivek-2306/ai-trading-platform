@@ -78,3 +78,57 @@ export async function getDataQuality(): Promise<DataQuality | null> {
     return null;
   }
 }
+
+export type MarketInstrument = {
+  id: number;
+  venue: string;
+  symbol: string;
+  asset_class: string;
+  active: boolean;
+};
+
+export type Candle = {
+  ts: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+};
+
+/** Instruments we hold candles for, or null if the API cannot answer. */
+export async function getInstruments(): Promise<MarketInstrument[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/instruments", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(6000),
+    });
+    return data ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "instruments_unavailable");
+    return null;
+  }
+}
+
+/** The newest candles (oldest first), or null if the API cannot answer. */
+export async function getCandles(
+  instrumentId: number,
+  timeframe: "1m" | "5m" | "1h" | "1d",
+  limit = 500,
+): Promise<Candle[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/candles", {
+      params: { query: { instrument_id: instrumentId, timeframe, limit } },
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    return data?.candles ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "candles_unavailable");
+    return null;
+  }
+}

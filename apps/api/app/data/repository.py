@@ -16,16 +16,17 @@ _WRITE_CHUNK = 2000
 
 
 async def get_or_create_instrument(session: AsyncSession, spec: InstrumentSpec) -> Instrument:
-    statement = (
+    where = (Instrument.venue == spec.venue, Instrument.symbol == spec.symbol)
+    existing = (await session.execute(select(Instrument).where(*where))).scalar_one_or_none()
+    if existing is not None:  # the usual case; avoids burning an id from the sequence
+        return existing
+    # Another worker may insert the same instrument at the same moment: ignore that race.
+    await session.execute(
         insert(Instrument)
         .values(venue=spec.venue, symbol=spec.symbol, asset_class=spec.asset_class.value)
         .on_conflict_do_nothing(constraint="uq_instruments_venue_symbol")
     )
-    await session.execute(statement)
-    result = await session.execute(
-        select(Instrument).where(Instrument.venue == spec.venue, Instrument.symbol == spec.symbol)
-    )
-    return result.scalar_one()
+    return (await session.execute(select(Instrument).where(*where))).scalar_one()
 
 
 async def insert_candles(
