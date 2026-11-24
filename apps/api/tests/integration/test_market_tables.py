@@ -362,6 +362,14 @@ def test_instruments_and_candles_endpoints(postgres_url: str, redis_url: str) ->
             },
         ).json()
         missing = client.get("/data/candles", params={"instrument_id": 99999, "timeframe": "1h"})
+        naive = client.get(  # no timezone: treated as UTC
+            "/data/candles",
+            params={
+                "instrument_id": instrument_id,
+                "timeframe": "1h",
+                "before": "2026-02-01T03:00:00",
+            },
+        ).json()
 
     assert any(i["symbol"] == "DOGE/USDT" and i["id"] == instrument_id for i in listing)
     # Newest four first page, oldest-first inside the page.
@@ -375,3 +383,8 @@ def test_instruments_and_candles_endpoints(postgres_url: str, redis_url: str) ->
     assert len(page2["candles"]) == 4 and page2["candles"][-1]["ts"][:13] == "2026-02-01T05"
     assert len(last["candles"]) == 2 and last["next_before"] is None
     assert missing.status_code == 404
+    assert [c["ts"][:13] for c in naive["candles"]] == [
+        "2026-02-01T00",
+        "2026-02-01T01",
+        "2026-02-01T02",
+    ]
