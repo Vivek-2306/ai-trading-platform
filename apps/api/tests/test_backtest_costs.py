@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from app.backtest.costs import TIERS, round_trip_cost_bps, tier
-from app.backtest.engine import BacktestConfig, run_backtest
+from app.backtest.engine import BacktestConfig, BacktestResult, Trade, run_backtest
 from app.backtest.runner import config_from_dict
 from tests.test_backtest_engine import BUY, candles, cfg, script
 
@@ -73,3 +73,55 @@ def test_the_maker_rate_changes_the_hash_and_survives_the_stored_round_trip() ->
 def test_a_negative_maker_fee_is_refused() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         BacktestConfig("BTC/USDT", "5m", maker_fee_pct=D("-0.01"))
+
+
+def _result(trades: list[Trade], days: int = 10) -> BacktestResult:
+    from datetime import timedelta
+
+    from tests.test_backtest_metrics import result as make_result
+
+    out = make_result(trades, ["1000"] * 3)
+    out.times = [out.times[0], out.times[1], out.times[0] + timedelta(days=days)]
+    return out
+
+
+def test_cost_drag_splits_gross_fees_and_net_and_shows_the_edge_per_trade() -> None:
+    from app.backtest.costs import cost_drag
+    from tests.test_backtest_metrics import trade
+
+    # Two trades of 1 unit at entry 100: net +10 and -6, fees 2 each (gross +12 and -4).
+    result = _result([trade("10", fees="2"), trade("-6", fees="2")], days=2)
+
+    drag = cost_drag(result)
+
+    assert drag["trades"] == 2 and drag["trades_per_day"] == 1.0
+    assert drag["gross_pnl"] == "8" and drag["fees_paid"] == "4" and drag["net_pnl"] == "4"
+    assert drag["fee_share_of_gross_pct"] == 50.0  # fees ate half of what the moves made
+    assert drag["avg_gross_bps_per_trade"] == 400.0  # 8 / 200 notional
+    assert drag["avg_fee_bps_per_trade"] == 200.0
+    assert "400.0 bps" in str(drag["verdict"])
+
+
+def test_when_the_moves_lose_money_before_fees_costs_are_not_blamed() -> None:
+    from app.backtest.costs import cost_drag
+    from tests.test_backtest_metrics import trade
+
+    result = _result([trade("-10", fees="1"), trade("-5", fees="1")])
+
+    drag = cost_drag(result)
+
+    assert drag["fee_share_of_gross_pct"] is None
+    assert "signals are" in str(drag["verdict"])
+
+
+def test_cost_drag_with_no_trades_and_json_safety() -> None:
+    import json
+
+    from app.backtest.costs import cost_drag
+    from tests.test_backtest_metrics import result as make_result
+    from tests.test_backtest_metrics import trade
+
+    assert cost_drag(make_result([], ["1000"] * 3))["trades"] == 0
+    full = cost_drag(_result([trade("10")] * 3))
+    assert json.loads(json.dumps(full)) == full
+    assert full["exit_reasons"] == {"target": 3}

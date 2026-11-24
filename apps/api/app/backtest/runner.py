@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.analysis.features import MIN_CANDLES
 from app.backtest.benchmark import compare, run_buy_and_hold
+from app.backtest.costs import cost_drag
 from app.backtest.engine import BacktestConfig, BacktestResult, run_backtest
 from app.backtest.identity import strategy_fingerprint
 from app.backtest.metrics import compute_metrics
@@ -293,7 +294,11 @@ async def run_and_store(
                 splits.tuning,
                 tuning,
                 run_buy_and_hold(splits.tuning, config),
-                {"stats": tuning.stats, "oos_start": splits.oos.oos_start.isoformat()},
+                {
+                    "stats": tuning.stats,
+                    "oos_start": splits.oos.oos_start.isoformat(),
+                    "cost_drag": cost_drag(tuning),
+                },
             )
         )
         if walk_forward_run:
@@ -335,6 +340,7 @@ async def run_and_store(
                         "oos_start": splits.oos.oos_start.isoformat(),
                         "note": "Judged once; this period can no longer be used to tune.",
                         "strategy_fingerprint": strategy_fingerprint(),
+                        "cost_drag": cost_drag(verdict),
                     },
                 )
             )

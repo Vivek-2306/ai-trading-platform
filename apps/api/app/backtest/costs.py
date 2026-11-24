@@ -13,8 +13,12 @@ deliberately optimistic bound ("what if costs were almost free?"), not something
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 D = Decimal
+
+if TYPE_CHECKING:
+    from app.backtest.engine import BacktestResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,3 +61,53 @@ def round_trip_cost_bps(
     if exit_by_target and maker_pct is not None:
         return entry + maker_pct * 100
     return entry + taker_pct * 100 + slippage_bps
+
+
+def cost_drag(result: "BacktestResult") -> dict[str, object]:
+    """Where a run's money went: how often it traded, what the moves were worth before fees,
+    what fees took, and how big the average move was next to what one trade costs.
+
+    "Gross" is after slippage (the fill prices already include it) and before fees. When gross
+    is already negative, costs are not what sank the strategy: the signals were wrong.
+    """
+    trades = result.trades
+    if not trades:
+        return {"trades": 0, "verdict": "No trades, so there are no costs to analyse."}
+    notional = sum((t.quantity * t.entry_price for t in trades), D(0))
+    fees = sum((t.fees for t in trades), D(0))
+    net = sum((t.pnl for t in trades), D(0))
+    gross = net + fees
+    days = max((result.times[-1] - result.times[0]).total_seconds() / 86_400, 1 / 24)
+    reasons: dict[str, int] = {}
+    for t in trades:
+        reasons[t.exit_reason] = reasons.get(t.exit_reason, 0) + 1
+    gross_bps = float(gross / notional * 10_000)
+    fee_bps = float(fees / notional * 10_000)
+    slippage_bps = float(result.config.slippage_bps)
+    market_exit_share = 1 - reasons.get("target", 0) / len(trades)
+    slippage_round_trip = slippage_bps * (1 + market_exit_share)  # an estimate: entry + exits
+    if gross <= 0:
+        verdict = (
+            f"The moves lose money before fees ({gross_bps:.1f} bps per trade): costs are not "
+            "the main problem, the signals are."
+        )
+    else:
+        verdict = (
+            f"Average move before fees: {gross_bps:.1f} bps per trade; fees take {fee_bps:.1f} bps"
+            f" and slippage about {slippage_round_trip:.1f} bps, leaving "
+            f"{gross_bps - fee_bps:.1f} bps before counting slippage's effect on price."
+        )
+    return {
+        "trades": len(trades),
+        "trades_per_day": round(len(trades) / days, 2),
+        "gross_pnl": format(gross, "f"),
+        "fees_paid": format(fees, "f"),
+        "net_pnl": format(net, "f"),
+        "fee_share_of_gross_pct": round(float(fees / gross * 100), 1) if gross > 0 else None,
+        "avg_notional": format(notional / len(trades), "f"),
+        "avg_gross_bps_per_trade": round(gross_bps, 2),
+        "avg_fee_bps_per_trade": round(fee_bps, 2),
+        "estimated_slippage_bps_round_trip": round(slippage_round_trip, 2),
+        "exit_reasons": reasons,
+        "verdict": verdict,
+    }
