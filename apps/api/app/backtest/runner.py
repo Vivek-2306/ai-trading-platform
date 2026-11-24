@@ -172,6 +172,37 @@ async def _claim_judgement(session: AsyncSession, key: OosKey, config_hash: str)
     _ = result
 
 
+async def tuning_candles(
+    sessions: async_sessionmaker[AsyncSession],
+    spec: InstrumentSpec,
+    key: OosKey,
+    *,
+    oos_fraction: float = 0.2,
+) -> list[RawCandle]:
+    """The candles BEFORE the locked period, for research that is not a backtest (model
+    training, analysis). Fixes the lock the same way a first backtest would, so nothing that
+    uses this can see what a later judgement will use."""
+    async with sessions() as session:
+        instrument = (
+            await session.execute(
+                select(Instrument).where(
+                    Instrument.venue == spec.venue, Instrument.symbol == spec.symbol
+                )
+            )
+        ).scalar_one()
+        candles = await load_candles(session, instrument.id, key.timeframe)
+        registry = await _registry(session, key)
+        if len(candles) < MIN_HISTORY_TO_LOCK:
+            raise ValueError(f"only {len(candles)} candles are stored; need {MIN_HISTORY_TO_LOCK}")
+        existed = registry.get(key) is not None
+        splits = make_splits(candles, key, registry, oos_fraction=oos_fraction)
+        if not existed or not await _lock_saved(session, key):
+            await _save_lock(session, key, splits.oos.oos_start)
+            registry = await _registry(session, key)
+            splits = make_splits(candles, key, registry, oos_fraction=oos_fraction)
+        return splits.tuning
+
+
 @dataclass(frozen=True, slots=True)
 class StoredRun:
     id: int

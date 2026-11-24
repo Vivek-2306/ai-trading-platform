@@ -4,14 +4,19 @@
 
 ## Current phase
 
-**Phase 9b — Scalping strategy research** on `phase-9b-scalping` (AITP-75 … 80). Phases 7 to 9 merged (PRs #16 to #20).
-v0.1.0 released 2026-11-24. Later phases (10 to 12) are planned in `docs/PLAN.md`.
-Tickets: 75 fee tiers and maker/taker model, 76 scalping strategies (rules only, fixed parameters), 77 backtests on
-1m/5m with walk-forward and one out-of-sample judgement each, 78 cost-drag analysis, 79 scalping risk limits
-(max trades per day, cooldown), 80 research report and go/no-go.
+**Phase 10 — ML layer** on `phase-10-ml` (AITP-81 … 86). Phases 7 to 9b merged (PRs #16 to #21).
+Tickets: 81 labels and dataset, 82 purged walk-forward training, 83 baselines and calibration, 84 ML strategy in the
+backtest, 85 one out-of-sample judgement, 86 report and go/no-go.
 
-Phase 9 result to remember: `rules-v2` does not beat buy-and-hold (hourly loses ~25 to 28% after costs; daily
-is roughly flat). The locked out-of-sample period for the swing rules is still unspent (owner's decision).
+Results to remember: `rules-v2` does not beat buy-and-hold (Phase 9). Phase 9b: all 12 scalping combinations fail
+out of sample (`docs/SCALPING_RESEARCH.md`); no scalping goes to paper trading. The swing out-of-sample lock is
+still unspent (owner decision pending, needed at AITP-85).
+
+Phase 10 status: AITP-81 to 84 done. On the tuning region the model does not beat the training base rate
+(AUC 0.50 to 0.56, Brier worse than the prior on BTC and ETH 1h and 1d), and 1h entries at p >= 0.50 hit the target
+38 to 41% of the time against a cost-adjusted break-even of 47 to 50%. Tuning backtests: 1h -16% (BTC), -25% (ETH);
+1d +6.6% / +2.6% on about 90 trades. AITP-85: owner decided NOT to spend the swing lock (2026-11-24), so the model is not judged out of sample.
+AITP-86 report generated: **no-go** (`docs/ML_RESEARCH.md`). The swing lock remains unspent.
 
 ## Last completed
 

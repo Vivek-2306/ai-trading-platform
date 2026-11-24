@@ -39,3 +39,8 @@ def resolve(name: str) -> StrategyDef:
         return STRATEGIES[name]
     except KeyError:
         raise ValueError(f"unknown strategy {name!r}; choose from {sorted(STRATEGIES)}") from None
+
+
+def register(definition: StrategyDef) -> None:
+    """Add a strategy that needs data to build (a trained model) before it can run."""
+    STRATEGIES[definition.name] = definition
