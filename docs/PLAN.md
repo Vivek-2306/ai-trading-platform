@@ -186,9 +186,22 @@ Ticket numbers continue from AITP-41; Notion tickets are created by `/start-phas
 
 **Out of scope:** live or paper scalping, ML.
 
+### Phase 10 — ML layer (`phase-10-ml`)
+
+**Goal:** find out whether LightGBM probabilities beat the rules baseline out of sample on swing timeframes (1h, 1d; BTC and ETH). Ships only if they do.
+
+- AITP-81 Labels and dataset builder. AC: label = target (1.6 ATR) hit before stop (1.0 ATR) within N candles; reuses the causal features; leakage test passes; the locked out-of-sample period is excluded.
+- AITP-82 Training with purged walk-forward validation. AC: gap between train and validation avoids label overlap; runs tracked in MLflow; parameters declared in advance.
+- AITP-83 Baselines and calibration. AC: compared with the rules, buy-and-hold and a coin-flip model; probabilities calibrated; Brier score reported.
+- AITP-84 ML strategy in the backtest. AC: registered as `ml-lgbm-v1`; passes the leakage check; risk veto unchanged; the model only gates entries and never sizes.
+- AITP-85 One out-of-sample judgement. AC: runs stored; pass rules fixed in advance (net return above 0, profit factor at least 1.2, at least 30 trades, better than the rules on the same period).
+- AITP-86 Report and go/no-go. AC: generated `docs/ML_RESEARCH.md`; a failing model does not ship.
+
+**Out of scope:** news, AI reasoning, paper trading, live signals from the model.
+**Owner decision pending (at AITP-85):** spend the swing out-of-sample lock once, for both the rules and the model.
+
 ### Later phases (outline only; tickets written when they start)
 
-- **Phase 10 — ML layer:** LightGBM probabilities, MLflow tracking, walk-forward validation. Ships only if it beats the rules baseline out-of-sample.
 - **Phase 11 — News and AI layer:** Haiku bulk news scoring, Opus final reasoning, pgvector context. The AI explains; it never sizes or places orders.
 - **Phase 12 — Paper trading and alerts:** simulated trades on live prices for swing and scalping, tracked by the same metrics, Telegram alerts.
 - **After that:** web polish, mobile app (Expo), Indian markets (broker decision then), optional live trading behind approval and hard limits.
