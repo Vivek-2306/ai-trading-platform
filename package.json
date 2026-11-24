@@ -23,7 +23,9 @@
     "beat": "pnpm --filter @aitp/api beat",
     "test:integration": "pnpm --filter @aitp/api test:integration",
     "tunnel": "bash scripts/tunnel.sh",
-    "api:postman": "pnpm --filter @aitp/api postman"
+    "api:postman": "pnpm --filter @aitp/api postman",
+    "hooks:install": "cd apps/api && uv run pre-commit install --config ../../.pre-commit-config.yaml",
+    "hooks:run": "cd apps/api && uv run pre-commit run --all-files --config ../../.pre-commit-config.yaml"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",

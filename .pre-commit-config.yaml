@@ -1,0 +1,43 @@
+# Runs on `git commit`. Install once with: pnpm hooks:install
+# Uses the tools already in the repo (no extra downloads), so it is fast and offline.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(docs/api/|packages/api-client/)
+      - id: end-of-file-fixer
+        exclude: ^(docs/api/|packages/api-client/)
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+        exclude: ^(pnpm-lock\.yaml|apps/api/uv\.lock)$
+      - id: check-yaml
+      - id: check-json
+        exclude: ^biome\.json$
+
+  - repo: local
+    hooks:
+      - id: ruff-lint
+        name: Ruff (lint)
+        entry: uv run --project apps/api --no-sync ruff check --fix
+        language: system
+        types: [python]
+        files: ^apps/api/
+      - id: ruff-format
+        name: Ruff (format)
+        entry: uv run --project apps/api --no-sync ruff format
+        language: system
+        types: [python]
+        files: ^apps/api/
+      - id: biome
+        name: Biome (TypeScript, JSON, CSS)
+        entry: node_modules/.bin/biome check --write --no-errors-on-unmatched
+        language: system
+        files: \.(ts|tsx|js|mjs|json|css)$
+        exclude: ^(packages/api-client/(src/schema\.ts|openapi\.json)|docs/api/)
+      - id: gitleaks
+        name: gitleaks (secrets in staged changes)
+        entry: gitleaks protect --staged --redact --no-banner
+        language: system
+        pass_filenames: false
