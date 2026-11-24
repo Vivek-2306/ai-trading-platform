@@ -98,7 +98,13 @@ def compare(strategy: BacktestResult, benchmark: BacktestResult) -> Comparison:
     beat_return = excess > 0
     smaller_drawdown = s.max_drawdown_pct < b.max_drawdown_pct
     beat_sharpe = None if s.sharpe is None or b.sharpe is None else s.sharpe > b.sharpe
-    if beat_return:
+    exposure = f"{s.exposure_pct:.0f}%"
+    if s.trades == 0:
+        verdict = (
+            f"The strategy never traded, so it held cash: {s.total_return_pct:.2f}% vs "
+            f"{b.total_return_pct:.2f}% for buy-and-hold. That is staying out, not skill."
+        )
+    elif beat_return:
         verdict = (
             f"Beat buy-and-hold by {excess:.2f} percentage points after costs "
             f"({s.total_return_pct:.2f}% vs {b.total_return_pct:.2f}%)."
@@ -106,14 +112,15 @@ def compare(strategy: BacktestResult, benchmark: BacktestResult) -> Comparison:
     elif smaller_drawdown:
         verdict = (
             f"Lagged buy-and-hold by {-excess:.2f} points ({s.total_return_pct:.2f}% vs "
-            f"{b.total_return_pct:.2f}%) but with a smaller worst fall "
-            f"({s.max_drawdown_pct:.1f}% vs {b.max_drawdown_pct:.1f}%)."
+            f"{b.total_return_pct:.2f}%) with a smaller worst fall "
+            f"({s.max_drawdown_pct:.1f}% vs {b.max_drawdown_pct:.1f}%), but it was in the market "
+            f"only {exposure} of the time and buy-and-hold was fully invested."
         )
     else:
         verdict = (
             f"Did not beat buy-and-hold: {s.total_return_pct:.2f}% vs {b.total_return_pct:.2f}%, "
             f"with no smaller drawdown."
         )
-    if s.warnings:
-        verdict += " " + s.warnings[0]
+    for warning in s.warnings:
+        verdict += " " + warning
     return Comparison(s, b, excess, beat_return, smaller_drawdown, beat_sharpe, verdict)

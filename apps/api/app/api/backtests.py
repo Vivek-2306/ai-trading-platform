@@ -3,16 +3,17 @@
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.orm import load_only
 
 from app.core.database import SessionDep
 from app.data.models import BacktestRun, Instrument, Timeframe
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
-Segment = str  # "tuning", "walk_forward" or "oos"
+MAX_TRADES = 200
 
 
 class BacktestSummary(BaseModel):
@@ -35,7 +36,9 @@ class BacktestSummary(BaseModel):
 class BacktestDetail(BacktestSummary):
     config: dict[str, Any]
     data_fingerprint: str
+    # The latest trades only (at most MAX_TRADES); `trade_count` is how many there were.
     trades: list[dict[str, Any]]
+    trade_count: int
     # Downsampled equity curves: {"times": [...], "strategy": [...], "benchmark": [...]}.
     equity: dict[str, Any]
     details: dict[str, Any]
@@ -68,8 +71,27 @@ async def list_backtests(
     limit: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> list[BacktestSummary]:
     """Newest first. Past results with simulated costs: not a forecast and not advice."""
+    summary_columns = [
+        getattr(BacktestRun, name)
+        for name in (
+            "id",
+            "created_at",
+            "instrument_id",
+            "timeframe",
+            "strategy",
+            "segment",
+            "config_hash",
+            "range_start",
+            "range_end",
+            "candle_count",
+            "code_version",
+            "metrics",
+            "benchmark",
+        )
+    ]
     statement = (
         select(BacktestRun, Instrument.symbol)
+        .options(load_only(*summary_columns))  # not the big trades / curves JSON
         .join(Instrument, Instrument.id == BacktestRun.instrument_id)
         .order_by(BacktestRun.id.desc())
         .limit(limit)
@@ -89,7 +111,9 @@ async def list_backtests(
     summary="One backtest run in full",
     responses={404: {"description": "Unknown run"}},
 )
-async def get_backtest(run_id: int, session: SessionDep) -> BacktestDetail:
+async def get_backtest(
+    session: SessionDep, run_id: Annotated[int, Path(ge=1, le=2**63 - 1)]
+) -> BacktestDetail:
     row = (
         await session.execute(
             select(BacktestRun, Instrument.symbol)
@@ -104,7 +128,8 @@ async def get_backtest(run_id: int, session: SessionDep) -> BacktestDetail:
         **_summary_fields(run, symbol),
         config=run.config,
         data_fingerprint=run.data_fingerprint,
-        trades=run.trades,
+        trades=run.trades[-MAX_TRADES:],
+        trade_count=len(run.trades),
         equity=run.equity,
         details=run.details,
     )

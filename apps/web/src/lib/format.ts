@@ -15,7 +15,8 @@ export function money(value: string | null | undefined, maxDecimals = 2): string
   const sign = whole.startsWith("-") ? "-" : "";
   const digits = whole.replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const trimmed = fraction.slice(0, maxDecimals).replace(/0+$/, "");
-  return `${sign}${digits}${trimmed ? `.${trimmed}` : ""}`;
+  const body = `${digits}${trimmed ? `.${trimmed}` : ""}`;
+  return body === "0" ? "0" : `${sign}${body}`; // never "-0"
 }
 
 export const SEGMENT_LABEL: Record<string, string> = {

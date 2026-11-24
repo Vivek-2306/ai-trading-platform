@@ -24,6 +24,7 @@ class Metrics:
     trades: int
     wins: int
     losses: int
+    breakeven: int
     win_rate_pct: float | None
     profit_factor: float | None  # gross profit / gross loss; None when there were no losses
     expectancy: Decimal | None  # average net P&L per trade, in the quote currency
@@ -82,23 +83,27 @@ def compute_metrics(result: BacktestResult) -> Metrics:
     trades = result.trades
     pnls = [t.pnl for t in trades]
     wins = [p for p in pnls if p > 0]
-    losses = [p for p in pnls if p <= 0]
+    losses = [p for p in pnls if p < 0]
+    breakeven = len(pnls) - len(wins) - len(losses)
     gross_win = sum(wins, Decimal(0))
     gross_loss = -sum((p for p in pnls if p < 0), Decimal(0))
-    equity = np.array([float(x) for x in result.equity], dtype=np.float64)
-    initial, final = result.equity[0], result.equity[-1]
+    # Before the first decision the strategy cannot act (indicator warm-up): those flat candles
+    # would dilute Sharpe and exposure, so measure from the first decision on.
+    live = result.equity[result.first_decision_index :] or result.equity
+    equity = np.array([float(x) for x in live], dtype=np.float64)
+    initial, final = live[0], live[-1]
     fees = sum((t.fees for t in trades), Decimal(0))
     net = sum(pnls, Decimal(0))
     n = len(trades)
 
     streak = longest = 0
     for p in pnls:
-        streak = streak + 1 if p <= 0 else 0
+        streak = streak + 1 if p < 0 else 0
         longest = max(longest, streak)
 
     avg_win = gross_win / len(wins) if wins else None
     avg_loss = (-gross_loss / len([p for p in pnls if p < 0])) if gross_loss > 0 else None
-    exposure = sum(t.bars_held for t in trades) / max(len(result.equity), 1) * 100.0
+    exposure = sum(t.bars_held + 1 for t in trades) / max(len(live), 1) * 100.0  # entry bar counts
 
     warnings: list[str] = []
     if n == 0:
@@ -109,7 +114,7 @@ def compute_metrics(result: BacktestResult) -> Metrics:
             "and the rest are mostly noise."
         )
 
-    periods = PERIODS_PER_YEAR.get(result.config.timeframe, 365.0)
+    periods = PERIODS_PER_YEAR[result.config.timeframe]
     profit_factor = float(gross_win / gross_loss) if gross_loss > 0 else None
     sharpe = sharpe_ratio(equity, periods)
     win_rate = len(wins) / n * 100.0 if n else None
@@ -126,10 +131,15 @@ def compute_metrics(result: BacktestResult) -> Metrics:
         trades=n,
         wins=len(wins),
         losses=len(losses),
+        breakeven=breakeven,
         win_rate_pct=win_rate,
         profit_factor=profit_factor,
         expectancy=net / n if n else None,
-        expectancy_r=float(sum((t.r_multiple for t in trades), Decimal(0)) / n) if n else None,
+        expectancy_r=(
+            float(sum((t.r_multiple for t in trades if t.risk_amount > 0), Decimal(0)) / n)
+            if n
+            else None
+        ),
         avg_win=avg_win,
         avg_loss=avg_loss,
         payoff_ratio=float(avg_win / -avg_loss) if avg_win and avg_loss else None,

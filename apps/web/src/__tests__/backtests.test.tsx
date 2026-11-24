@@ -151,3 +151,27 @@ describe("fetchers", () => {
     expect(await getBacktests()).toBeNull();
   });
 });
+
+describe("robustness", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("never shows a negative zero", () => {
+    expect(money("-0.001")).toBe("0");
+    expect(money("-0.50")).toBe("-0.5");
+  });
+
+  it("leaves out chart points it cannot draw instead of throwing", () => {
+    render(
+      <EquityChart
+        curves={{
+          times: ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"],
+          strategy: [1000, 1010], // one value short
+          benchmark: [1000, 1100, Number.NaN],
+        }}
+      />,
+    );
+    expect(setData).toHaveBeenCalledTimes(2);
+    expect(setData.mock.calls[0]?.[0]).toHaveLength(2); // the strategy line has 2 real points
+    expect(setData.mock.calls[1]?.[0]).toHaveLength(2); // the NaN point is dropped
+  });
+});

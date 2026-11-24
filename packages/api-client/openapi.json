@@ -79,6 +79,10 @@
             "title": "Timeframe",
             "type": "string"
           },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          },
           "trades": {
             "items": {
               "additionalProperties": true,
@@ -105,6 +109,7 @@
           "config",
           "data_fingerprint",
           "trades",
+          "trade_count",
           "equity",
           "details"
         ],
@@ -1136,6 +1141,8 @@
             "name": "run_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Run Id",
               "type": "integer"
             }

@@ -31,11 +31,15 @@ export function EquityChart({ curves }: { curves: Curves }) {
     });
     const series = (values: number[] | undefined, color: string) => {
       const line = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false });
+      // Only real points: the chart throws on a missing value.
       line.setData(
-        times.map((t, i) => ({
-          time: Math.floor(Date.parse(t) / 1000) as UTCTimestamp,
-          value: values?.[i] ?? Number.NaN,
-        })),
+        times.flatMap((t, i) => {
+          const value = values?.[i];
+          const time = Math.floor(Date.parse(t) / 1000);
+          return value !== undefined && Number.isFinite(value) && Number.isFinite(time)
+            ? [{ time: time as UTCTimestamp, value }]
+            : [];
+        }),
       );
     };
     series(curves.strategy, "#818cf8");
@@ -60,7 +64,7 @@ export function EquityChart({ curves }: { curves: Curves }) {
       <div
         ref={container}
         role="img"
-        aria-label="Equity curve of the strategy compared with buy and hold"
+        aria-label={`Equity curve: the strategy ends at ${last(curves.strategy)?.toLocaleString("en-US") ?? "n/a"}, buy and hold at ${last(curves.benchmark)?.toLocaleString("en-US") ?? "n/a"}`}
         className="h-72 w-full"
       />
     </div>

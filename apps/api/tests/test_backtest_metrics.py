@@ -103,7 +103,9 @@ def test_sharpe_is_none_without_spread_or_data() -> None:
 def test_exposure_is_the_share_of_candles_in_a_position() -> None:
     m = compute_metrics(result([trade("10", bars=10), trade("10", bars=10)], ["1000"] * 100))
 
-    assert m.exposure_pct == 20.0
+    # Measured from the first decision (candle 50): 100 - 50 = 50 live candles, and each trade
+    # was in the market for 11 of them (the entry candle counts).
+    assert m.exposure_pct == 44.0
     assert m.avg_bars_held == 10.0
 
 
@@ -139,3 +141,20 @@ def test_the_timeframe_sets_the_annualisation() -> None:
 
     assert hourly is not None and daily is not None
     assert math.isclose(hourly / daily, math.sqrt(8760 / 365))
+
+
+def test_breakeven_trades_are_neither_wins_nor_losses_and_do_not_break_a_streak_count() -> None:
+    m = compute_metrics(result([trade("10"), trade("0"), trade("-5"), trade("-5")], ["1000"] * 3))
+
+    assert (m.wins, m.losses, m.breakeven) == (1, 2, 1)
+    assert m.win_rate_pct == 25.0 and m.longest_losing_streak == 2
+    assert m.profit_factor == 1.0  # 10 won / 10 lost
+
+
+def test_the_warm_up_candles_do_not_dilute_sharpe() -> None:
+    flat_then_moving = ["1000"] * 60 + ["1010", "1005", "1020", "1030", "1025"]
+
+    m = compute_metrics(result([], flat_then_moving))
+    live = np.array([float(x) for x in flat_then_moving[50:]])
+
+    assert m.sharpe == sharpe_ratio(live, 8760.0)

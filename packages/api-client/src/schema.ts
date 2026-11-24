@@ -321,6 +321,8 @@ export interface components {
             symbol: string;
             /** Timeframe */
             timeframe: string;
+            /** Trade Count */
+            trade_count: number;
             /** Trades */
             trades: {
                 [key: string]: unknown;

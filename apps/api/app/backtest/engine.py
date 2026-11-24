@@ -31,6 +31,7 @@ import numpy as np
 
 from app.analysis.features import MIN_CANDLES, FeatureTable, compute_features
 from app.analysis.indicators import CandleSeries
+from app.backtest.identity import strategy_fingerprint
 from app.data.adapters.base import RawCandle
 from app.data.models import SignalAction
 from app.risk.limits import RiskLimits
@@ -76,8 +77,9 @@ class BacktestConfig:
         return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in asdict(self).items()}
 
     def config_hash(self) -> str:
-        blob = json.dumps(self.to_dict(), sort_keys=True).encode()
-        return hashlib.sha256(blob).hexdigest()[:16]
+        """Identifies the configuration AND the code that interprets it (see identity.py)."""
+        blob = json.dumps({**self.to_dict(), "code": strategy_fingerprint()}, sort_keys=True)
+        return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
     def risk_limits(self, capital: Decimal) -> RiskLimits:
         """The limits for one decision, sized from current equity."""
@@ -284,7 +286,7 @@ def run_backtest(
         if position is not None:
             if candle.low <= position.stop:
                 close_position(i, min(position.stop, candle.open), "stop", market=True)
-            elif candle.high >= position.target:
+            elif candle.high > position.target:  # must trade THROUGH the target to fill
                 close_position(i, position.target, "target", market=False)
 
         # 3. Mark to market at the close.

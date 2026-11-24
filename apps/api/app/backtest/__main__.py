@@ -2,7 +2,7 @@
 
     cd apps/api
     uv run python -m app.backtest run --symbol BTC/USDT --timeframe 1h
-    uv run python -m app.backtest run --symbol BTC/USDT --timeframe 1h --judge-oos
+    uv run python -m app.backtest run --symbol BTC/USDT --timeframe 1h --judge-oos --yes
     uv run python -m app.backtest rerun 12
 
 `--judge-oos` spends the locked out-of-sample period on this configuration. It can be done once
@@ -45,6 +45,17 @@ async def _main(args: argparse.Namespace) -> int:
             slippage_bps=Decimal(args.slippage_bps),
             latency_candles=args.latency,
         )
+        if args.judge_oos and not args.yes:
+            print(  # noqa: T201
+                "This spends the locked out-of-sample period on THIS configuration, once.\n"
+                f"  symbol {config.symbol}  timeframe {config.timeframe}\n"
+                f"  config {config.config_hash()}  (settings plus the rules code)\n"
+                f"  capital {config.capital}  fee {config.fee_pct}%  "
+                f"slippage {config.slippage_bps} bps  latency {config.latency_candles}\n"
+                "A different configuration (or changed rules) can never judge this period after "
+                "this. Check the numbers, then run again with --yes."
+            )
+            return 3
         try:
             runs = await run_and_store(
                 sessions, _spec(args.symbol), config, judge_oos_period=args.judge_oos
@@ -74,6 +85,7 @@ def main() -> None:
     run.add_argument("--slippage-bps", default="5")
     run.add_argument("--latency", type=int, default=0)
     run.add_argument("--judge-oos", action="store_true", help="spend the locked period (once)")
+    run.add_argument("--yes", action="store_true", help="confirm --judge-oos")
     again = sub.add_parser("rerun")
     again.add_argument("run_id", type=int)
     raise SystemExit(asyncio.run(_main(parser.parse_args())))

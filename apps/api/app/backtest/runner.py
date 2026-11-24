@@ -15,8 +15,10 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analysis.features import MIN_CANDLES
 from app.backtest.benchmark import compare, run_buy_and_hold
 from app.backtest.engine import BacktestConfig, BacktestResult, run_backtest
+from app.backtest.identity import strategy_fingerprint
 from app.backtest.metrics import compute_metrics
 from app.backtest.splits import MemoryRegistry, OosKey, OosLockedError, make_splits
 from app.backtest.walkforward import oos_feed, run_on_tuning, walk_forward
@@ -29,6 +31,8 @@ from app.data.universe import InstrumentSpec
 logger = get_logger(__name__)
 
 MAX_CURVE_POINTS = 400
+MIN_HISTORY_TO_LOCK = 500  # candles needed before the locked period is fixed
+MIN_OOS_CANDLES = 100  # a locked period smaller than this cannot be judged
 _DECIMAL_FIELDS = {
     "capital",
     "fee_pct",
@@ -100,7 +104,29 @@ async def _registry(session: AsyncSession, key: OosKey) -> MemoryRegistry:
         registry.set_start(key, row.oos_start)
         if row.config_hash:
             registry.set_judged(key, row.config_hash)
+        return registry
+    # A new timeframe for a symbol that already has a locked period: it is the same price
+    # history, so it shares that start (otherwise tuning on 1d could use what 1h judged).
+    other = (
+        await session.execute(
+            text(
+                "SELECT oos_start FROM oos_locks WHERE symbol = :s AND strategy = :g "
+                "ORDER BY created_at LIMIT 1"
+            ),
+            {"s": key.symbol, "g": key.strategy},
+        )
+    ).scalar_one_or_none()
+    if other is not None:
+        registry.set_start(key, other)
     return registry
+
+
+async def _lock_saved(session: AsyncSession, key: OosKey) -> bool:
+    row = await session.execute(
+        text("SELECT 1 FROM oos_locks WHERE symbol = :s AND timeframe = :t AND strategy = :g"),
+        {"s": key.symbol, "t": key.timeframe, "g": key.strategy},
+    )
+    return row.first() is not None
 
 
 async def _save_lock(session: AsyncSession, key: OosKey, oos_start: datetime) -> None:
@@ -241,10 +267,18 @@ async def run_and_store(
         ).scalar_one()
         candles = await load_candles(session, instrument.id, config.timeframe)
         registry = await _registry(session, key)
+        if len(candles) < MIN_HISTORY_TO_LOCK:
+            raise ValueError(
+                f"only {len(candles)} candles are stored; backfill at least {MIN_HISTORY_TO_LOCK} "
+                "before backtesting (the first run fixes where the locked period starts)"
+            )
         existed = registry.get(key) is not None
         splits = make_splits(candles, key, registry, oos_fraction=oos_fraction)
-        if not existed:
+        if not existed or not await _lock_saved(session, key):
             await _save_lock(session, key, splits.oos.oos_start)
+            # Another run may have created the lock first: always use what the database holds.
+            registry = await _registry(session, key)
+            splits = make_splits(candles, key, registry, oos_fraction=oos_fraction)
 
         runs: list[BacktestRun] = []
         tuning = run_on_tuning(splits, config)
@@ -278,8 +312,13 @@ async def run_and_store(
             )
         if judge_oos_period:
             feed = oos_feed(splits, config)  # raises OosLockedError if another config judged it
+            if len(feed) - MIN_CANDLES < MIN_OOS_CANDLES:
+                raise ValueError(
+                    f"the locked period has only {len(feed) - MIN_CANDLES} candles; at least "
+                    f"{MIN_OOS_CANDLES} are needed, so it is not spent. Wait for more data."
+                )
+            verdict = run_backtest(feed, config)  # if this fails, the lock is not spent
             await _claim_judgement(session, key, config.config_hash())
-            verdict = run_backtest(feed, config)
             runs.append(
                 _row(
                     instrument.id,
@@ -292,6 +331,7 @@ async def run_and_store(
                         "stats": verdict.stats,
                         "oos_start": splits.oos.oos_start.isoformat(),
                         "note": "Judged once; this period can no longer be used to tune.",
+                        "strategy_fingerprint": strategy_fingerprint(),
                     },
                 )
             )

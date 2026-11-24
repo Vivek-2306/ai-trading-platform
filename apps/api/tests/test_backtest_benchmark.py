@@ -83,6 +83,17 @@ def test_a_strategy_that_trades_a_rising_market_lags_buy_and_hold() -> None:
     assert "Only 1 trades" in comparison.verdict  # the small-sample warning travels with it
 
 
+def test_a_smaller_drawdown_is_not_oversold_when_the_strategy_was_mostly_out() -> None:
+    data = rising(90, start=200.0, step=-1.0)
+    config = cfg()
+
+    comparison = compare(
+        run_backtest(data, config, script({60: BUY, 61: SELL})), run_buy_and_hold(data, config)
+    )
+
+    assert "in the market only" in comparison.verdict or comparison.verdict.startswith("Beat")
+
+
 def test_a_strategy_that_dodges_a_crash_beats_buy_and_hold() -> None:
     data = rising(90, start=200.0, step=-1.0)  # a steady fall
     config = cfg()
@@ -92,7 +103,9 @@ def test_a_strategy_that_dodges_a_crash_beats_buy_and_hold() -> None:
     assert comparison.strategy.total_return_pct == 0.0  # it never traded: cash kept its value
     assert comparison.benchmark.total_return_pct < 0
     assert comparison.beat_on_return and comparison.beat_on_drawdown
-    assert comparison.verdict.startswith("Beat buy-and-hold")
+    # Never trading is staying out, not skill, and the verdict must say so.
+    assert comparison.verdict.startswith("The strategy never traded")
+    assert "not skill" in comparison.verdict
 
 
 def test_the_comparison_is_json_ready() -> None:

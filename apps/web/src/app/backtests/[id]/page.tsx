@@ -86,10 +86,12 @@ export default async function BacktestPage({ params }: { params: Promise<{ id: s
 
       <Card>
         <p className="text-sm">
-          A simulation of the past with fees ({String(run.config.fee_pct)}% per fill) and slippage (
-          {String(run.config.slippage_bps)} bps). It is not a forecast and not advice.
-          {run.segment === "oos" &&
-            " This locked period was judged once; it can no longer be used to tune."}
+          A simulation of the past with fees ({String(run.config.fee_pct ?? "?")}% per fill) and
+          slippage ({String(run.config.slippage_bps ?? "?")} bps). It is not a forecast and not
+          advice.
+          {run.segment === "oos"
+            ? " This locked period was judged once; it can no longer be used to tune."
+            : " In-sample: the rules were designed with this history in view, so treat it as optimistic. Only the locked out-of-sample judgement is a fair test."}
         </p>
         {run.benchmark.verdict && <p className="mt-2 font-medium">{run.benchmark.verdict}</p>}
         {(m.warnings ?? []).map((w) => (
@@ -129,6 +131,11 @@ export default async function BacktestPage({ params }: { params: Promise<{ id: s
       {run.trades.length > 0 && (
         <Card className="overflow-x-auto p-3 sm:p-5">
           <h2 className="font-medium">Latest trades</h2>
+          {run.trade_count !== undefined && run.trade_count > run.trades.length && (
+            <p className="mt-1 text-sm text-muted">
+              Showing the latest {run.trades.length} of {run.trade_count}.
+            </p>
+          )}
           <table className="mt-3 w-full min-w-[34rem] text-sm">
             <thead className="text-left text-muted">
               <tr>

@@ -109,6 +109,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Dropping the locks would let the locked period be judged again. Refuse while any exist.
+    locked = op.get_bind().execute(sa.text("SELECT count(*) FROM oos_locks")).scalar()
+    if locked:
+        raise RuntimeError(
+            f"refusing to drop oos_locks: it holds {locked} lock(s). Dropping them would let "
+            "the locked out-of-sample periods be judged again."
+        )
     op.drop_table("oos_locks")
     op.execute("DROP FUNCTION IF EXISTS oos_lock_guard()")
     op.drop_table("backtest_runs")

@@ -330,7 +330,9 @@ export type BacktestTrade = {
 export type BacktestDetail = BacktestSummary & {
   config: Record<string, string | number>;
   data_fingerprint: string;
+  /** The latest trades only; `trade_count` is how many there were in all. */
   trades: BacktestTrade[];
+  trade_count?: number;
   equity: { times?: string[]; strategy?: number[]; benchmark?: number[] };
   details: {
     windows?: {

@@ -6,6 +6,9 @@ every decision made before the cut must be identical, and every trade closed bef
 must be identical. A strategy that peeks at the future (its own copy of the data, a shifted
 array, an index off by one) decides differently when the future is missing, and is caught.
 
+This finds a strategy that peeks. It cannot find look-ahead inside the engine itself (for example
+filling at the signal's own close): that is covered by the hand-computed engine tests.
+
 Strategies are passed as FACTORIES that build the strategy from the candles it is given, so
 the cut history is what the strategy sees. A strategy that smuggles in the full data some other
 way cannot be caught by any black-box check: keep strategies pure functions of the features.
@@ -14,6 +17,7 @@ way cannot be caught by any black-box check: keep strategies pure functions of t
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from app.analysis.features import MIN_CANDLES
 from app.backtest.engine import (
     BacktestConfig,
     BacktestResult,
@@ -49,6 +53,7 @@ def find_backtest_lookahead(
     full = run_backtest(ordered, config, make_strategy(ordered))
     full_decisions = dict(full.decisions)
     points = list(cuts) if cuts is not None else [n * k // 5 for k in range(2, 5)]
+    points = [c for c in points if c >= MIN_CANDLES + 3]  # shorter histories cannot be run
     leaks: list[Leak] = []
     for cut in points:
         head = ordered[:cut]
