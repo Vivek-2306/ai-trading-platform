@@ -8,6 +8,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Web app (`apps/web`): Next.js 16, responsive glass UI with dark/light themes, live system status page, Biome and Vitest, typed API client generated from OpenAPI, validated env, pino logs with request IDs shared with the API, `pnpm tunnel` for phone/tablet previews, web CI job (AITP-18 … 23, 36, 37).
 - Monorepo root: pnpm workspace, Turborepo pipelines, editor and runtime version files (AITP-1).
 - README, CHANGELOG and `.env.example` (AITP-2).
 - GitHub PR template, issue templates and CODEOWNERS (AITP-3).

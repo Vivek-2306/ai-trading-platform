@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "generate": "cd ../../apps/api && PYTHONPATH=. uv run python scripts/export_openapi.py ../../packages/api-client/openapi.json && cd ../../packages/api-client && openapi-typescript openapi.json -o src/schema.ts && cd ../.. && biome format --write packages/api-client/src/schema.ts",
+    "generate": "cd ../../apps/api && PYTHONPATH=. uv run python scripts/export_openapi.py ../../packages/api-client/openapi.json && cd ../../packages/api-client && openapi-typescript openapi.json -o src/schema.ts",
     "check:fresh": "pnpm generate && git diff --exit-code -- openapi.json src/schema.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
