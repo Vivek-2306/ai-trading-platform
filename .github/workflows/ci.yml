@@ -137,3 +137,4 @@ jobs:
         run: uv run pytest tests/test_packages.py --no-cov
         env:
           REQUIRE_ALL_PACKAGES: "1"
+          MLFLOW_DISABLE_TELEMETRY: "true"

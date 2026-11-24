@@ -53,7 +53,7 @@ Phases 1–4b merged into `develop` (PRs #1–#5).
 
 - Phase 4 merged (PR #4). Phase 4b: AITP-39 Postman collection generated from OpenAPI (`pnpm api:postman`, CI checks it), AITP-38 Notion API Reference database (5 rows) + CLAUDE.md rule 12, AITP-40 log redaction, quiet health probes, optional `LOG_FILE` and `SENTRY_DSN`; 61 API tests.
 
-- Phase 4b merged (PR #5). Phase 5: uv groups `analysis` (pandas, NumPy, Polars, SciPy, statsmodels, TA-Lib, vectorbt, QuantStats, exchange-calendars), `ml` (scikit-learn, LightGBM, Optuna, MLflow, SHAP), `ai` (anthropic, voyageai, pgvector) + AI settings, `markets` (kiteconnect, ccxt, alpaca-py, polygon, finnhub, fredapi, feedparser, trafilatura, python-telegram-bot, websockets, tenacity); smoke tests + CI job; Dependabot. Findings: exchange-calendars has BSE (`XBOM`) but no NSE calendar; LightGBM needs `brew install libomp` on macOS (Linux image needs libgomp1, Phase 6).
+- Phase 4b merged (PR #5). Phase 5: uv groups `analysis` (pandas, NumPy, Polars, SciPy, statsmodels, TA-Lib, vectorbt, QuantStats, exchange-calendars), `ml` (scikit-learn, LightGBM, Optuna, MLflow, SHAP), `ai` (anthropic, voyageai, pgvector) + AI settings, `markets` (kiteconnect, ccxt, alpaca-py, polygon, finnhub, fredapi, feedparser, trafilatura, python-telegram-bot, websockets, tenacity); smoke tests + CI job; Dependabot. Findings: exchange-calendars has BSE (`XBOM`) but no NSE calendar; LightGBM needs `brew install libomp` on macOS (Linux image needs libgomp1, Phase 6). QuantStats pulls in yfinance (Yahoo scraping: fine for experiments, not a production data source); MLflow is the lightweight `mlflow-skinny` client, telemetry off in CI (`MLFLOW_DISABLE_TELEMETRY=true`; set it locally too).
 
 ## In progress
 

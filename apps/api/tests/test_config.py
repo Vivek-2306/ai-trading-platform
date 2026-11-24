@@ -84,3 +84,11 @@ def test_ai_settings_defaults_and_secrets_are_hidden() -> None:
     assert "sk-ant-secret" not in repr(settings)
     assert settings.anthropic_api_key is not None
     assert settings.anthropic_api_key.get_secret_value() == "sk-ant-secret"
+
+
+def test_empty_optional_values_mean_unset() -> None:
+    settings = Settings(_env_file=None, anthropic_api_key="", sentry_dsn="", log_file="")
+
+    assert settings.anthropic_api_key is None
+    assert settings.sentry_dsn is None
+    assert settings.log_file is None

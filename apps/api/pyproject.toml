@@ -66,7 +66,7 @@ markets = [
 ]
 ml = [
     "lightgbm>=4.7.0",
-    "mlflow>=3.18.0",
+    "mlflow-skinny>=3.18.0",
     "optuna>=5.1.0",
     "scikit-learn>=1.9.1",
     "shap>=0.54.1",
@@ -95,11 +95,7 @@ files = ["app", "tests"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = [
-    "error",
-    # exchange-calendars 4.x still uses a pandas API that pandas 3.1 deprecates (library issue).
-    "ignore:Series.values returning an ndarray:pandas.errors.Pandas4Warning",
-]
+filterwarnings = ["error"]
 addopts = "--strict-markers -m \"not integration\" --cov=app --cov-report=term-missing"
 markers = [
     "integration: needs real Postgres/Redis (Docker); skipped unless selected",

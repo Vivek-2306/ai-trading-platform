@@ -18,6 +18,8 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 # Dependencies first, so code changes don't invalidate this layer.
 COPY pyproject.toml uv.lock ./
+# The analysis/ml/ai/markets groups are NOT installed yet. When app code needs one, add
+# `--group <name>` here (and `apt-get install libgomp1` in the final stage for LightGBM).
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 COPY app ./app
