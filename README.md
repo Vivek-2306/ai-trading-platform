@@ -5,7 +5,7 @@ crypto, Forex and derivatives. It analyses prices, indicators, news, fundamental
 events, then recommends **Buy, Sell, Hold or NO TRADE** with entry, stop-loss, target,
 position size, risk-to-reward and a confidence score.
 
-> **Status:** early setup (v0.x). No trading features yet. Nothing here is financial advice.
+> **Status:** setup complete (v0.1). No trading features yet. Nothing here is financial advice.
 
 ## Principles
 
@@ -40,15 +40,35 @@ docs/           Plans, architecture, ADRs, progress
 ## Quickstart
 
 Requirements: Node 24, pnpm 9, Python 3.13, uv, Docker, jq (used by the Claude Code format hook).
+On macOS also `brew install libomp` (LightGBM) and `brew install gitleaks` (commit hook).
 
 ```bash
-cp .env.example .env          # fill in values; never commit .env
-pnpm install                  # TypeScript workspace tooling
-pnpm infra:up                 # Postgres + TimescaleDB + pgvector, Redis (Docker)
-pnpm lint && pnpm typecheck && pnpm test
+git clone https://github.com/Vivek-2306/ai-trading-platform.git && cd ai-trading-platform
+cp .env.example .env     # optional: the defaults already work for local development
+pnpm bootstrap           # installs JS + Python packages and the git hooks
+pnpm infra:up            # Postgres + TimescaleDB + pgvector and Redis (Docker)
+pnpm db:migrate          # create the database schema
+pnpm check               # lint + typecheck + tests (everything should pass)
 ```
 
-App start commands will be added as the API and web app land (setup Phases 2–4).
+Run it:
+
+```bash
+cd apps/api && uv run uvicorn app.main:create_app --factory --reload   # API  http://localhost:8000/docs
+pnpm --filter @aitp/web dev                                            # Web  http://localhost:3000
+pnpm worker                                                            # background jobs (optional)
+pnpm tunnel                                                            # public URL for a phone/tablet
+```
+
+| Command | What it does |
+| --- | --- |
+| `pnpm check` | lint + typecheck + unit tests, all packages |
+| `pnpm test:integration` | tests against real Postgres and Redis (starts its own containers) |
+| `pnpm format` | auto-format everything |
+| `pnpm api:postman` | regenerate the Postman collection after an API change |
+| `pnpm --filter @aitp/api-client generate` | regenerate the typed web client after an API change |
+| `pnpm infra:up` / `infra:down` | start / stop the local database and Redis |
+| `pnpm stack:up` / `stack:down` | the full production stack on one server. First `cp infra/prod.env.example infra/prod.env` and fill it in |
 
 ## Docs
 

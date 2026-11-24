@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Phase 5 — Domain packages and dependency management** on `phase-5-domain-deps` (AITP-24 … 29).
-Phases 1–4b merged into `develop` (PRs #1–#5).
+**Phase 6 — Quality gates, deploy base and v0.1.0** on `phase-6-quality-deploy` (AITP-30 … 35).
+Phases 1–5 merged into `develop` (PRs #1–#6). See `docs/SETUP_REPORT.md`.
 
 ## Last completed
 
@@ -55,17 +55,19 @@ Phases 1–4b merged into `develop` (PRs #1–#5).
 
 - Phase 4b merged (PR #5). Phase 5: uv groups `analysis` (pandas, NumPy, Polars, SciPy, statsmodels, TA-Lib, vectorbt, QuantStats, exchange-calendars), `ml` (scikit-learn, LightGBM, Optuna, MLflow, SHAP), `ai` (anthropic, voyageai, pgvector) + AI settings, `markets` (kiteconnect, ccxt, alpaca-py, polygon, finnhub, fredapi, feedparser, trafilatura, python-telegram-bot, websockets, tenacity); smoke tests + CI job; Dependabot. Findings: exchange-calendars has BSE (`XBOM`) but no NSE calendar; LightGBM needs `brew install libomp` on macOS (Linux image needs libgomp1, Phase 6). QuantStats pulls in yfinance (Yahoo scraping: fine for experiments, not a production data source); MLflow is the lightweight `mlflow-skinny` client, telemetry off in CI (`MLFLOW_DISABLE_TELEMETRY=true`; set it locally too).
 
+- Phase 5 merged (PR #6). Phase 6: AITP-30 pre-commit hooks (`pnpm hooks:install`), AITP-31 gitleaks in CI (full history clean), AITP-32 production Compose (web, API, worker, beat, db, redis, Caddy; verified locally, only Caddy exposed), AITP-33 quickstart verified from a fresh clone (`pnpm bootstrap`, `pnpm check`), AITP-34 branch protection script (4 required checks; `main` not strict so release PRs cannot deadlock), AITP-35 setup report + CHANGELOG 0.1.0.
+
 ## In progress
 
-Phase 5 finishing: self-review, then PR into `develop`.
+Phase 6 PR into `develop` (owner review).
 
 ## Next up
 
-1. Owner reviews and merges the Phase 5 PR; then `/release-phase 5`.
-2. Phase 6 — quality gates, deploy base, v0.1.0 (AITP-30 … 35) after the owner says "go". The API Docker image must install `libgomp1` once the ml group ships in it.
-3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL=http://127.0.0.1:8000`, `POSTGRES_PORT=5432`,
-   `REDIS_PORT=6379`, `LOG_FILE=`, `SENTRY_DSN=`, `ANTHROPIC_API_KEY=`, `VOYAGE_API_KEY=`; then `cp .env.example .env`.
-4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
+1. Owner reviews and merges the Phase 6 PR; then `/release-phase 6`.
+2. Release v0.1.0: PR `develop` → `main` (merge commit), then tag `v0.1.0` (`/release-phase release v0.1.0`).
+3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
+4. Owner: answer the open product decisions below, then plan feature phases (`/plan-project`).
+5. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 
 ## Open questions (owner decisions)
 
