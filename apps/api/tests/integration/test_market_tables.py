@@ -832,3 +832,96 @@ def test_refresh_aggregates_materializes_old_minutes(postgres_url: str) -> None:
         return int(count.scalar_one())
 
     assert _run(postgres_url, work) == 2
+
+
+def test_signals_are_append_only(postgres_url: str) -> None:
+    from sqlalchemy.exc import DBAPIError
+
+    from app.data.models import AssetClass, Signal, Timeframe
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    ts = datetime(2026, 7, 1, 12, 0, tzinfo=UTC)
+
+    def sig(iid: int, action: str = "BUY", confidence: str = "0.7") -> Signal:
+        return Signal(
+            instrument_id=iid,
+            timeframe=Timeframe.H1.value,
+            candle_ts=ts,
+            action=action,
+            confidence=Decimal(confidence),
+            reasons=[{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
+            inputs={"rsi": 25.0},
+            rule_version="rules-v1",
+        )
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        spec = InstrumentSpec("binance", "ALGO/USDT", AssetClass.CRYPTO)
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        out: dict[str, object] = {}
+        out["first"] = await record_signal(session, sig(iid))
+        out["again"] = await record_signal(session, sig(iid, action="SELL"))  # same candle
+        for name, statement in (
+            ("update", "UPDATE signals SET action = 'SELL' WHERE instrument_id = :i"),
+            ("delete", "DELETE FROM signals WHERE instrument_id = :i"),
+        ):
+            try:
+                await session.execute(text(statement), {"i": iid})
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "append-only" if "append-only" in str(exc) else str(exc)
+        try:
+            await session.execute(text("TRUNCATE signals"))
+            await session.commit()
+            out["truncate"] = "allowed"
+        except DBAPIError as exc:
+            await session.rollback()
+            out["truncate"] = "append-only" if "append-only" in str(exc) else str(exc)
+        row = (
+            await session.execute(
+                text(
+                    "SELECT action, confidence, reasons, inputs FROM signals "
+                    "WHERE instrument_id = :i"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        out["row"] = (row.action, row.confidence, row.reasons, row.inputs)
+        for bad in ({"action": "MAYBE"}, {"confidence": "1.5"}):
+            try:
+                await record_signal(
+                    session, sig(iid, **bad).__class__(**{**_asdict(sig(iid)), **bad})
+                )
+                out["bad_" + next(iter(bad))] = "accepted"
+            except DBAPIError:
+                await session.rollback()
+                out["bad_" + next(iter(bad))] = "rejected"
+        return out
+
+    def _asdict(s: Signal) -> dict[str, object]:
+        return {
+            "instrument_id": s.instrument_id,
+            "timeframe": s.timeframe,
+            "candle_ts": s.candle_ts + timedelta(hours=1),
+            "action": s.action,
+            "confidence": s.confidence,
+            "reasons": s.reasons,
+            "inputs": s.inputs,
+            "rule_version": s.rule_version,
+        }
+
+    out = _run(postgres_url, work)
+    assert out["first"] is True
+    assert out["again"] is False  # one signal per instrument, timeframe, candle and rule version
+    assert out["update"] == out["delete"] == out["truncate"] == "append-only"
+    assert out["row"] == (
+        "BUY",
+        Decimal("0.7000"),
+        [{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
+        {"rsi": 25.0},
+    )  # untouched by the blocked update
+    assert out["bad_action"] == out["bad_confidence"] == "rejected"
