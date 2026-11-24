@@ -92,13 +92,17 @@ class WalkForwardResult:
 
 
 def walk_forward_predict(
-    data: Dataset, params: dict[str, Any] | None = None, **fold_args: int
+    data: Dataset,
+    params: dict[str, Any] | None = None,
+    *,
+    min_train_rows: int = MIN_TRAIN_ROWS,
+    test_rows: int = TEST_ROWS,
 ) -> WalkForwardResult:
     from sklearn.metrics import brier_score_loss, roc_auc_score
 
     proba = np.full(len(data), np.nan)
     metrics: list[FoldMetrics] = []
-    for fold in purged_folds(data, **fold_args):
+    for fold in purged_folds(data, min_train_rows=min_train_rows, test_rows=test_rows):
         y_train = data.y[fold.train]
         if min(int((y_train == 0).sum()), int((y_train == 1).sum())) < MIN_CLASS_ROWS:
             continue
