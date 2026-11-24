@@ -19,6 +19,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@aitp/api-client':
+        specifier: workspace:^
+        version: link:../../packages/api-client
       '@next/env':
         specifier: ^16.4.6
         version: 16.4.6

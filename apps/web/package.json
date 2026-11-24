@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aitp/api-client": "workspace:^",
     "@next/env": "^16.4.6",
     "@tailwindcss/postcss": "^4.3.5",
     "class-variance-authority": "^0.7.1",
