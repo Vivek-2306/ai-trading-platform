@@ -14,7 +14,7 @@
     "test": "turbo run test",
     "format": "turbo run format",
     "build": "turbo run build",
-    "setup": "pnpm install && cd apps/api && uv sync --all-groups && cd ../.. && pnpm hooks:install",
+    "bootstrap": "pnpm install && cd apps/api && uv sync --all-groups && cd ../.. && pnpm hooks:install",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "stack:up": "docker compose --env-file infra/prod.env -f infra/docker-compose.prod.yml up -d --build",
     "stack:down": "docker compose --env-file infra/prod.env -f infra/docker-compose.prod.yml down",

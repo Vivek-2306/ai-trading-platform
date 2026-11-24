@@ -46,7 +46,7 @@ On macOS also `brew install libomp` (LightGBM) and `brew install gitleaks` (comm
 git clone https://github.com/Vivek-2306/ai-trading-platform.git && cd ai-trading-platform
 git checkout develop
 cp .env.example .env     # optional: the defaults already work for local development
-pnpm setup               # installs JS + Python packages and the git hooks
+pnpm bootstrap           # installs JS + Python packages and the git hooks
 pnpm infra:up            # Postgres + TimescaleDB + pgvector and Redis (Docker)
 pnpm db:migrate          # create the database schema
 pnpm check               # lint + typecheck + tests (everything should pass)
