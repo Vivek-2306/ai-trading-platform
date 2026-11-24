@@ -62,7 +62,9 @@ def _import(name: str) -> Any:
     try:
         return importlib.import_module(name)
     except ModuleNotFoundError as error:
-        if error.name == name and not REQUIRED:
+        # error.name is the top-level module that is missing (sklearn for sklearn.linear_model).
+        missing_it = error.name == name or name.startswith(f"{error.name}.")
+        if missing_it and not REQUIRED:
             pytest.skip(f"{name} is not installed (uv sync --all-groups)")
         raise
 
