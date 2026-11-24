@@ -7,6 +7,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.20.1",
     "asyncpg>=0.32.0",
+    "ccxt>=4.5.94",
     "celery[redis]>=5.7.0",
     "fastapi>=0.165.0",
     "httpx>=0.28.1",
@@ -16,6 +17,7 @@ dependencies = [
     "sentry-sdk>=3.0.0",
     "sqlalchemy[asyncio]>=2.1.9",
     "structlog>=26.1.0",
+    "tenacity>=9.2.1",
     "uvicorn[standard]>=0.54.0",
 ]
 
@@ -91,6 +93,11 @@ python_version = "3.13"
 strict = true
 plugins = ["pydantic.mypy"]
 files = ["app", "tests"]
+
+[[tool.mypy.overrides]]
+# ccxt ships no type hints.
+module = ["ccxt", "ccxt.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

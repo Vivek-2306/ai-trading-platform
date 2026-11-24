@@ -36,6 +36,11 @@ class Timeframe(StrEnum):
     H1 = "1h"
     D1 = "1d"
 
+    @property
+    def seconds(self) -> int:
+        """Length of one candle."""
+        return {"1m": 60, "5m": 300, "1h": 3600, "1d": 86400}[self.value]
+
 
 class AssetClass(StrEnum):
     CRYPTO = "crypto"
