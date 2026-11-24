@@ -23,7 +23,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
@@ -50,7 +50,9 @@ class BacktestConfig:
     timeframe: str
     strategy: str = "rules-v2"
     capital: Decimal = D("1000")
-    fee_pct: Decimal = D("0.1")  # per fill, percent of notional (Binance spot default tier)
+    fee_pct: Decimal = D("0.1")  # per market (taker) fill, percent of notional
+    # Fee for resting limit orders (the target exit). None: every fill pays fee_pct.
+    maker_fee_pct: Decimal | None = None
     slippage_bps: Decimal = D("5")  # per market fill, against you
     latency_candles: int = 0  # extra candles between the decision and the fill
     # The rest of the risk limits come from RiskLimits; only what changes results is recorded.
@@ -61,11 +63,17 @@ class BacktestConfig:
     stop_atr_multiple: Decimal = D("1.5")
     target_atr_multiple: Decimal = D("3")
     max_stop_distance_pct: Decimal = D("10")
+    # Scalping guard rails (see RiskLimits): trade cap per UTC day, pause after a run of losses.
+    max_trades_per_day: int = 20
+    cooldown_after_losses: int = 3
+    cooldown_minutes: int = 60
 
     def __post_init__(self) -> None:
+        negative_maker = self.maker_fee_pct is not None and self.maker_fee_pct < 0
         if (
             self.capital <= 0
             or self.fee_pct < 0
+            or negative_maker
             or self.slippage_bps < 0
             or self.latency_candles < 0
         ):
@@ -94,6 +102,9 @@ class BacktestConfig:
             stop_atr_multiple=self.stop_atr_multiple,
             target_atr_multiple=self.target_atr_multiple,
             max_stop_distance_pct=self.max_stop_distance_pct,
+            max_trades_per_day=self.max_trades_per_day,
+            cooldown_after_losses=self.cooldown_after_losses,
+            cooldown_minutes=self.cooldown_minutes,
         )
 
 
@@ -165,6 +176,9 @@ def default_strategy(table: FeatureTable) -> Decision:
     return evaluate(table)
 
 
+FeaturesFn = Callable[[CandleSeries], FeatureTable]
+
+
 def _slip(price: Decimal, bps: Decimal, side: str) -> Decimal:
     factor = bps / 10_000
     return price * (1 + factor) if side == "buy" else price * (1 - factor)
@@ -177,9 +191,10 @@ def _fee(notional: Decimal, fee_pct: Decimal) -> Decimal:
 def run_backtest(
     candles: list[RawCandle],
     config: BacktestConfig,
-    strategy: Strategy = default_strategy,
+    strategy: Strategy | None = None,
     *,
     ask_at_last: bool = False,
+    features_fn: FeaturesFn | None = None,
 ) -> BacktestResult:
     """Replay `candles` (oldest first) through the strategy and the risk engine.
 
@@ -189,8 +204,13 @@ def run_backtest(
     if len(candles) < MIN_CANDLES + 2:
         raise ValueError(f"need at least {MIN_CANDLES + 2} candles to backtest")
     ordered = sorted(candles, key=lambda c: c.ts)
+    if strategy is None:
+        from app.backtest.registry import resolve  # late: the registry imports strategies
+
+        chosen = resolve(config.strategy)
+        strategy, features_fn = chosen.decide, features_fn or chosen.features
     series = CandleSeries.from_candles(ordered)
-    features = compute_features(series)  # causal: the value at t only uses candles up to t
+    features = (features_fn or compute_features)(series)  # causal: value at t uses candles <= t
     n = len(ordered)
     step = quantity_step(config.symbol)
 
@@ -202,13 +222,18 @@ def run_backtest(
     stats = {"decisions": 0, "buy_signals": 0, "vetoed": 0, "skipped_fills": 0}
     decisions: list[tuple[int, str]] = []
     losses_by_day: dict[str, Decimal] = {}
+    entries_by_day: dict[str, int] = {}
+    consecutive_losses = 0
+    cooldown_until: datetime | None = None
+    cooldown_seconds = config.cooldown_minutes * 60
 
     def close_position(index: int, price: Decimal, reason: str, market: bool) -> None:
-        nonlocal cash, position
+        nonlocal cash, position, consecutive_losses, cooldown_until
         assert position is not None
         fill = _slip(price, config.slippage_bps, "sell") if market else price
         proceeds = position.quantity * fill
-        fee = _fee(proceeds, config.fee_pct)
+        rate = config.maker_fee_pct if (not market and config.maker_fee_pct is not None) else None
+        fee = _fee(proceeds, config.fee_pct if rate is None else rate)
         cash += proceeds - fee
         pnl = proceeds - fee - (position.quantity * position.entry_price + position.entry_cost)
         trades.append(
@@ -228,6 +253,12 @@ def run_backtest(
         if pnl < 0:
             day = ordered[index].ts.date().isoformat()
             losses_by_day[day] = losses_by_day.get(day, D(0)) - pnl
+            consecutive_losses += 1
+            if consecutive_losses >= config.cooldown_after_losses:
+                cooldown_until = ordered[index].ts + timedelta(seconds=cooldown_seconds)
+                consecutive_losses = 0
+        else:
+            consecutive_losses = 0
         position = None
 
     for i in range(n):
@@ -269,6 +300,8 @@ def run_backtest(
                         cost = quantity * fill
                         fee = _fee(cost, config.fee_pct)
                         cash -= cost + fee
+                        entry_day = candle.ts.date().isoformat()
+                        entries_by_day[entry_day] = entries_by_day.get(entry_day, 0) + 1
                         position = _Position(
                             quantity=quantity,
                             entry_price=fill,
@@ -311,7 +344,12 @@ def run_backtest(
                 entry=candle.close,
                 atr=decision.inputs.get("atr"),
                 limits=config.risk_limits(max(cash, D("0.00000001"))),
-                state=PortfolioState(0, losses_by_day.get(day, D(0))),
+                state=PortfolioState(
+                    0,
+                    losses_by_day.get(day, D(0)),
+                    entries_by_day.get(day, 0),
+                    cooldown_until is not None and candle.ts < cooldown_until,
+                ),
                 kill_switch_on=False,
             )
             if assessment.action is SignalAction.BUY:

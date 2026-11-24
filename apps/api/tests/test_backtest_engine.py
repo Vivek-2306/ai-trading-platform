@@ -276,3 +276,47 @@ def test_too_few_candles_is_an_error_and_bad_config_is_refused() -> None:
         cfg(fee_pct=D("-1"))
     with pytest.raises(ValueError, match="capital must be positive"):
         cfg(capital=D("0"))
+
+
+def test_the_daily_trade_cap_blocks_the_next_entry_that_day() -> None:
+    data = candles(
+        c62={"high": "108", "low": "100.5", "close": "107"},
+        c65={"high": "108", "low": "100.5", "close": "107"},
+        c68={"high": "108", "low": "100.5", "close": "107"},
+    )
+
+    result = run_backtest(data, cfg(max_trades_per_day=2), script({60: BUY, 63: BUY, 66: BUY}))
+
+    assert len(result.trades) == 2  # the third entry the same UTC day is refused
+    assert result.stats["vetoed"] == 1
+
+
+def test_losses_in_a_row_trigger_a_cooldown_that_ends() -> None:
+    stop = {"high": "100.4", "low": "95", "close": "96"}
+    data = candles(c62=stop, c65=stop)
+    config = cfg(
+        cooldown_after_losses=2,
+        cooldown_minutes=300,
+        max_daily_loss_pct=D("5"),
+        risk_per_trade_pct=D("0.5"),
+    )
+
+    result = run_backtest(data, config, script({60: BUY, 63: BUY, 66: BUY, 72: BUY}))
+
+    entries = [t.entry_ts for t in result.trades]
+    assert T0 + timedelta(hours=61) in entries and T0 + timedelta(hours=64) in entries
+    assert T0 + timedelta(hours=67) not in entries  # inside the 5-hour pause after 2 losses
+    assert T0 + timedelta(hours=73) in entries  # the pause is over: trading resumes
+    assert result.stats["vetoed"] == 1
+
+
+def test_a_win_resets_the_losing_streak() -> None:
+    stop = {"high": "100.4", "low": "95", "close": "96"}
+    win = {"high": "108", "low": "100.5", "close": "107"}
+    data = candles(c62=stop, c65=win, c68=stop)
+    config = cfg(cooldown_after_losses=2, cooldown_minutes=600, max_daily_loss_pct=D("5"))
+
+    result = run_backtest(data, config, script({60: BUY, 63: BUY, 66: BUY, 69: BUY}))
+
+    assert len(result.trades) == 4  # loss, win, loss, then a fourth: no two losses in a row
+    assert result.stats["vetoed"] == 0

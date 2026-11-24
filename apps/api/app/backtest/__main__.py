@@ -33,6 +33,29 @@ async def _main(args: argparse.Namespace) -> int:
     engine = create_async_engine(get_settings().database_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     try:
+        if args.command == "research":
+            from app.scalping.research import combos, run_research
+
+            if args.judge_oos and not args.yes:
+                print(  # noqa: T201
+                    f"This spends the locked out-of-sample period of {len(combos())} "
+                    "strategy/instrument/timeframe combinations, once each, with the declared "
+                    "configuration (see app/scalping/research.py). Run again with --yes."
+                )
+                return 3
+            try:
+                results = await run_research(sessions, judge_oos=args.judge_oos)
+            except OosLockedError as error:
+                print(f"REFUSED: {error}")  # noqa: T201
+                return 2
+            for combo, runs in results.items():
+                print(f"{combo.strategy} {combo.symbol} {combo.timeframe}: {len(runs)} runs")  # noqa: T201
+            return 0
+        if args.command == "research-report":
+            from app.scalping.report import write_report
+
+            print(await write_report(sessions))  # noqa: T201
+            return 0
         if args.command == "rerun":
             result = await rerun(sessions, args.run_id)
             print("identical" if result.identical else "DIFFERENT: " + "; ".join(result.reasons))  # noqa: T201
@@ -86,6 +109,12 @@ def main() -> None:
     run.add_argument("--latency", type=int, default=0)
     run.add_argument("--judge-oos", action="store_true", help="spend the locked period (once)")
     run.add_argument("--yes", action="store_true", help="confirm --judge-oos")
+    research = sub.add_parser("research", help="the scalping research protocol (Phase 9b)")
+    research.add_argument(
+        "--judge-oos", action="store_true", help="spend the locked periods (once)"
+    )
+    research.add_argument("--yes", action="store_true", help="confirm --judge-oos")
+    sub.add_parser("research-report", help="write docs/SCALPING_RESEARCH.md from stored runs")
     again = sub.add_parser("rerun")
     again.add_argument("run_id", type=int)
     raise SystemExit(asyncio.run(_main(parser.parse_args())))

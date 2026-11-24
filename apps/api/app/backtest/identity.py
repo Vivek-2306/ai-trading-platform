@@ -23,6 +23,8 @@ _FILES = (
     "analysis/indicators.py",
     "analysis/features.py",
     "backtest/engine.py",
+    "backtest/registry.py",
+    "scalping/strategies.py",
 )
 
 

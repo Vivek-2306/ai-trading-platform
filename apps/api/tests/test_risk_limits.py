@@ -109,3 +109,29 @@ def test_limits_cannot_be_changed_after_validation() -> None:
 
     with pytest.raises(ValidationError):
         limits.risk_per_trade_pct = D("50")  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"max_trades_per_day": 0},
+        {"max_trades_per_day": 501},
+        {"cooldown_after_losses": 0},
+        {"cooldown_after_losses": 21},
+        {"cooldown_minutes": -1},
+        {"cooldown_minutes": 1441},
+    ],
+)
+def test_scalping_limits_have_hard_ceilings(over: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        make(**over)
+
+
+def test_scalping_limit_defaults_are_conservative() -> None:
+    limits = make()
+
+    assert (limits.max_trades_per_day, limits.cooldown_after_losses, limits.cooldown_minutes) == (
+        20,
+        3,
+        60,
+    )

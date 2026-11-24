@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.analysis.features import MIN_CANDLES
 from app.backtest.benchmark import compare, run_buy_and_hold
+from app.backtest.costs import cost_drag
 from app.backtest.engine import BacktestConfig, BacktestResult, run_backtest
 from app.backtest.identity import strategy_fingerprint
 from app.backtest.metrics import compute_metrics
@@ -36,6 +37,7 @@ MIN_OOS_CANDLES = 100  # a locked period smaller than this cannot be judged
 _DECIMAL_FIELDS = {
     "capital",
     "fee_pct",
+    "maker_fee_pct",
     "slippage_bps",
     "risk_per_trade_pct",
     "max_capital_share_pct",
@@ -61,7 +63,9 @@ def code_version() -> str:
 
 
 def config_from_dict(data: dict[str, Any]) -> BacktestConfig:
-    values: dict[str, Any] = {k: Decimal(v) if k in _DECIMAL_FIELDS else v for k, v in data.items()}
+    values: dict[str, Any] = {
+        k: Decimal(v) if k in _DECIMAL_FIELDS and v is not None else v for k, v in data.items()
+    }
     return BacktestConfig(**values)
 
 
@@ -290,7 +294,11 @@ async def run_and_store(
                 splits.tuning,
                 tuning,
                 run_buy_and_hold(splits.tuning, config),
-                {"stats": tuning.stats, "oos_start": splits.oos.oos_start.isoformat()},
+                {
+                    "stats": tuning.stats,
+                    "oos_start": splits.oos.oos_start.isoformat(),
+                    "cost_drag": cost_drag(tuning),
+                },
             )
         )
         if walk_forward_run:
@@ -332,6 +340,7 @@ async def run_and_store(
                         "oos_start": splits.oos.oos_start.isoformat(),
                         "note": "Judged once; this period can no longer be used to tune.",
                         "strategy_fingerprint": strategy_fingerprint(),
+                        "cost_drag": cost_drag(verdict),
                     },
                 )
             )

@@ -16,6 +16,9 @@ Values outside the hard ceilings are rejected when the API starts.
 | `RISK_MAX_CAPITAL_SHARE_PCT` | 20 | 0 to 100 | Largest share of capital in one position |
 | `RISK_MAX_DAILY_LOSS_PCT` | 2 | 0 to 10 | No new entries once today's losses reach this |
 | `RISK_MAX_OPEN_POSITIONS` | 3 | 1 to 20 | Most positions open at once |
+| `RISK_MAX_TRADES_PER_DAY` | 20 | 1 to 500 | No new entry after this many in one UTC day (a guard against overtrading) |
+| `RISK_COOLDOWN_AFTER_LOSSES` | 3 | 1 to 20 | Pause new entries after this many losses in a row |
+| `RISK_COOLDOWN_MINUTES` | 60 | 0 to 1440 | How long that pause lasts |
 | `RISK_MIN_RISK_REWARD` | 1.5 | at least 1 | Smallest accepted reward per unit of risk |
 | `RISK_STOP_ATR_MULTIPLE` | 1.5 | 0.5 to 10 | Stop distance in ATR (average candle range) |
 | `RISK_TARGET_ATR_MULTIPLE` | 3 | 0 to 20 | Target distance in ATR |

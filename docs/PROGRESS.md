@@ -4,10 +4,14 @@
 
 ## Current phase
 
-**Phase 9 — Backtesting** on `phase-9-backtest` (AITP-68 … 74). Phases 7, 7b, 8a, 8b merged (PRs #16 to #19).
-v0.1.0 released 2026-11-24. Later phases (9b, 10 to 12) are planned in `docs/PLAN.md`.
-Tickets: 68 backtest engine (fees, slippage, latency), 69 walk-forward + locked out-of-sample, 70 metrics,
-71 stored runs + Celery job + CLI, 72 leakage tests, 73 buy-and-hold benchmark, 74 API + web report.
+**Phase 9b — Scalping strategy research** on `phase-9b-scalping` (AITP-75 … 80). Phases 7 to 9 merged (PRs #16 to #20).
+v0.1.0 released 2026-11-24. Later phases (10 to 12) are planned in `docs/PLAN.md`.
+Tickets: 75 fee tiers and maker/taker model, 76 scalping strategies (rules only, fixed parameters), 77 backtests on
+1m/5m with walk-forward and one out-of-sample judgement each, 78 cost-drag analysis, 79 scalping risk limits
+(max trades per day, cooldown), 80 research report and go/no-go.
+
+Phase 9 result to remember: `rules-v2` does not beat buy-and-hold (hourly loses ~25 to 28% after costs; daily
+is roughly flat). The locked out-of-sample period for the swing rules is still unspent (owner's decision).
 
 ## Last completed
 
@@ -63,11 +67,17 @@ Tickets: 68 backtest engine (fees, slippage, latency), 69 walk-forward + locked 
 
 ## In progress
 
-Phase 9, ticket by ticket. Local servers run from `develop` after the 8b merge (logs in `/tmp/aitp-run/`).
+Phase 9b is implemented (AITP-75 to 80); self-review and PR next.
+
+Phase 9b result: **no-go**. All 12 strategy/instrument/timeframe combinations lose money out of sample
+(profit factor 0.01 to 0.30); average gross move per trade is about zero or negative before the ~20 bps
+round-trip fee, so the rules have no edge. Details in `docs/SCALPING_RESEARCH.md`. Scalping locks are spent;
+the swing lock is untouched.
 
 ## Next up
 
-1. Phase 9 in progress; the owner reviews and merges its PR when opened.
+1. Phase 9b in progress; the owner reviews and merges its PR when opened.
+   Owner decision pending: whether to judge the swing rules' locked out-of-sample period (`docs/BACKTESTING.md`).
 2. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 3. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 4. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
@@ -84,6 +94,12 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 - [x] Mobile app: after the web app.
 
 ## Known issues
+
+- Phase 9b limitations (deliberate, review-found): the backtest cooldown starts at the exit candle's open time
+  (about one candle shorter than configured); the daily trade cap counts an entry on its fill candle's UTC day
+  but checks on the decision candle's day (can exceed by one at midnight); the code fingerprint omits
+  `backtest/costs.py`, `risk/limits.py` and `scalping/research.py`. Not changed, because the scalping locks are spent
+  and the result (no-go) is far from any of these margins.
 
 - Phase 8a limitations (deliberate, to revisit): the signals trigger guards against mistakes but the table owner
   can still disable it (a non-owner app role would fix that); a candle corrected by the REST overwrite after its

@@ -206,3 +206,35 @@ def test_tiny_prices_are_stored_without_scientific_notation() -> None:
     if a.plan is not None:
         assert "E" not in "".join(str(v) for v in record["plan"].values())
         assert "E" not in "".join(str(v) for v in record["size"].values())
+
+
+def test_a_buy_over_the_daily_trade_cap_is_vetoed() -> None:
+    a = run(lim=limits(max_trades_per_day=5), state=PortfolioState(trades_today=5))
+
+    assert a.action is SignalAction.NO_TRADE and codes(a) == {"max_trades_per_day"}
+    assert "limit is 5" in a.vetoes[0].text
+
+
+def test_a_buy_during_the_cooldown_is_vetoed_and_says_why() -> None:
+    a = run(
+        lim=limits(cooldown_after_losses=2, cooldown_minutes=30),
+        state=PortfolioState(in_cooldown=True),
+    )
+
+    assert a.action is SignalAction.NO_TRADE and codes(a) == {"cooldown_after_losses"}
+    assert "30 minutes" in a.vetoes[0].text and "2 losses" in a.vetoes[0].text
+
+
+def test_the_scalping_limits_only_stop_new_buys() -> None:
+    state = PortfolioState(trades_today=999, in_cooldown=True)
+
+    for action in (SignalAction.SELL, SignalAction.HOLD, SignalAction.NO_TRADE):
+        assert run(action, state=state).action is action  # exits and non-trades pass through
+    assert run(SignalAction.BUY, state=state).action is SignalAction.NO_TRADE
+
+
+def test_the_record_snapshots_the_scalping_limits() -> None:
+    record = run(lim=limits(max_trades_per_day=7)).as_record()
+
+    assert record["limits"]["max_trades_per_day"] == "7"
+    assert record["limits"]["cooldown_minutes"] == "60"

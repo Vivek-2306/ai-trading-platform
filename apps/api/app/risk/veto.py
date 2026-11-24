@@ -29,6 +29,8 @@ class PortfolioState:
 
     open_positions: int = 0
     realized_loss_today: Decimal = Decimal(0)
+    trades_today: int = 0
+    in_cooldown: bool = False  # paused after a run of consecutive losses
 
 
 def current_portfolio_state() -> PortfolioState:
@@ -137,6 +139,21 @@ def assess(
                 "max_open_positions",
                 f"{state.open_positions} positions are open; the limit is "
                 f"{limits.max_open_positions}.",
+            )
+        )
+    if state.trades_today >= limits.max_trades_per_day:
+        vetoes.append(
+            Veto(
+                "max_trades_per_day",
+                f"{state.trades_today} trades today; the limit is {limits.max_trades_per_day}.",
+            )
+        )
+    if state.in_cooldown:
+        vetoes.append(
+            Veto(
+                "cooldown_after_losses",
+                f"Paused for {limits.cooldown_minutes} minutes after "
+                f"{limits.cooldown_after_losses} losses in a row.",
             )
         )
     daily_limit = limits.capital * limits.max_daily_loss_pct / 100
