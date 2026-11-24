@@ -4,6 +4,27 @@
  */
 
 export interface paths {
+    "/data/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data-quality report
+         * @description Per instrument and timeframe, over the last 30 days: missing candles (market-hours
+         *     aware), stale data, candles whose open or close lies outside high-low, and price spikes.
+         */
+        get: operations["quality_data_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -73,6 +94,38 @@ export interface components {
              */
             status: "ok";
         };
+        /** InstrumentQuality */
+        InstrumentQuality: {
+            /** Candles */
+            candles: number;
+            /** Gap Runs */
+            gap_runs: number;
+            /** Inconsistent Candles */
+            inconsistent_candles: number;
+            /** Latest */
+            latest: string | null;
+            /** Missing Candles */
+            missing_candles: number;
+            /** Ok */
+            ok: boolean;
+            /** Spikes */
+            spikes: number;
+            /** Stale */
+            stale: boolean;
+            /** Symbol */
+            symbol: string;
+            /** Timeframe */
+            timeframe: string;
+            /** Venue */
+            venue: string;
+        };
+        /** QualityResponse */
+        QualityResponse: {
+            /** Instruments */
+            instruments: components["schemas"]["InstrumentQuality"][];
+            /** Ok */
+            ok: boolean;
+        };
         /** ReadinessResponse */
         ReadinessResponse: {
             /** Checks */
@@ -105,6 +158,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    quality_data_quality_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityResponse"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;

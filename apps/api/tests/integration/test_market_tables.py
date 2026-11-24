@@ -279,3 +279,26 @@ def test_update_task_survives_one_failing_instrument(
     assert result["binance:BTC/USDT:1h"] == 0
     assert "binance:ETH/USDT:1h" not in result
     assert "binance:PAXG/USDT:1d" in result
+
+
+def test_quality_endpoint_reports_per_instrument(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.main import create_app
+
+    _migrate(postgres_url)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+
+    with TestClient(create_app(settings)) as client:
+        response = client.get("/data/quality")
+
+    body = response.json()
+    assert response.status_code == 200
+    keys = {(i["symbol"], i["timeframe"]) for i in body["instruments"]}
+    assert ("BTC/USDT", "1h") in keys
+    assert ("PAXG/USDT", "1d") in keys
+    assert ("XAU/USD", "1h") not in keys  # no Twelve Data key set
+    assert body["ok"] is False  # nothing loaded in this fresh database

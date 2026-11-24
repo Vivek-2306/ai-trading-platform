@@ -46,3 +46,35 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     return { api: "down" };
   }
 }
+
+export type DataQuality = {
+  ok: boolean;
+  instruments: {
+    venue: string;
+    symbol: string;
+    timeframe: string;
+    ok: boolean;
+    candles: number;
+    latest: string | null;
+    missing_candles: number;
+    stale: boolean;
+    inconsistent_candles: number;
+    spikes: number;
+  }[];
+};
+
+/** Market-data quality report, or null if the API or database cannot answer. */
+export async function getDataQuality(): Promise<DataQuality | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/quality", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    return data ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "data_quality_unavailable");
+    return null;
+  }
+}

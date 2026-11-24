@@ -1,14 +1,15 @@
 import { AutoRefresh } from "@/components/auto-refresh";
+import { DataQualityCard } from "@/components/data-quality";
 import { StatusPill } from "@/components/status-pill";
 import { Card, CardTitle } from "@/components/ui/card";
-import { getSystemStatus } from "@/lib/api";
+import { getDataQuality, getSystemStatus } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 const NAMES: Record<string, string> = { database: "Database", redis: "Redis" };
 
 export default async function Status() {
-  const status = await getSystemStatus();
+  const [status, quality] = await Promise.all([getSystemStatus(), getDataQuality()]);
   const services: { name: string; ok: boolean; note: string }[] =
     status.api === "down"
       ? [{ name: "API", ok: false, note: "Not reachable" }]
@@ -39,6 +40,7 @@ export default async function Status() {
           </Card>
         ))}
       </div>
+      <DataQualityCard quality={quality} />
     </div>
   );
 }

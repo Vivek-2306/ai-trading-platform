@@ -6,6 +6,47 @@
   },
   "item": [
     {
+      "name": "data",
+      "item": [
+        {
+          "name": "Data-quality report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/data/quality",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "data",
+                "quality"
+              ],
+              "variable": []
+            },
+            "description": "Data-quality report\n\nPer instrument and timeframe, over the last 30 days: missing candles (market-hours\naware), stale data, candles whose open or close lies outside high-low, and price spikes.\n\nDocumented responses: 200"
+          }
+        }
+      ]
+    },
+    {
       "name": "system",
       "item": [
         {

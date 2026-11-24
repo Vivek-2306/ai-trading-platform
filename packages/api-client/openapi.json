@@ -15,6 +15,98 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "InstrumentQuality": {
+        "properties": {
+          "candles": {
+            "title": "Candles",
+            "type": "integer"
+          },
+          "gap_runs": {
+            "title": "Gap Runs",
+            "type": "integer"
+          },
+          "inconsistent_candles": {
+            "title": "Inconsistent Candles",
+            "type": "integer"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "missing_candles": {
+            "title": "Missing Candles",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "spikes": {
+            "title": "Spikes",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "venue": {
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue",
+          "symbol",
+          "timeframe",
+          "ok",
+          "candles",
+          "latest",
+          "missing_candles",
+          "gap_runs",
+          "stale",
+          "inconsistent_candles",
+          "spikes"
+        ],
+        "title": "InstrumentQuality",
+        "type": "object"
+      },
+      "QualityResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentQuality"
+            },
+            "title": "Instruments",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "instruments"
+        ],
+        "title": "QualityResponse",
+        "type": "object"
+      },
       "ReadinessResponse": {
         "properties": {
           "checks": {
@@ -87,6 +179,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/data/quality": {
+      "get": {
+        "description": "Per instrument and timeframe, over the last 30 days: missing candles (market-hours\naware), stale data, candles whose open or close lies outside high-low, and price spikes.",
+        "operationId": "quality_data_quality_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Data-quality report",
+        "tags": [
+          "data"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "Returns ok while the process is up. It does not check dependencies; see /health/ready.",
