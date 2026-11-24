@@ -11,14 +11,19 @@ from app.core.error_reporting import init_error_reporting
 from app.core.logging import configure_logging, get_logger
 from app.core.redis import create_redis
 from app.data.adapters.base import RawCandle
+from app.data.adapters.binance import BinanceAdapter
 from app.data.models import Timeframe
 from app.data.repository import get_or_create_instrument, insert_candles
 from app.data.universe import default_universe
+from app.data.update import update_instrument
+from app.stream.healer import GapHealer
 from app.stream.health import beat
 from app.stream.service import StreamService
 from app.stream.writer import CandleWriter
 
 logger = get_logger(__name__)
+
+HEAL_LOOKBACK_DAYS = 1
 
 
 async def run() -> None:
@@ -42,15 +47,40 @@ async def run() -> None:
             return await insert_candles(session, instrument_ids[symbol], Timeframe.M1, candles)
 
     writer = CandleWriter(redis, persist)
+    rest = BinanceAdapter()
+
+    async def heal() -> None:
+        # Refetch the last day of 1m candles over REST and fill any holes.
+        for spec in specs:
+            result = await update_instrument(
+                sessions, rest, spec, Timeframe.M1, lookback_days=HEAL_LOOKBACK_DAYS
+            )
+            logger.info(
+                "stream_gap_heal",
+                symbol=spec.symbol,
+                new=result.new,
+                gaps_found=result.gaps_found,
+                gaps_refilled=result.gaps_refilled,
+            )
+
+    healer = GapHealer(heal)
     service = StreamService(
-        exchange, list(instrument_ids), writer.handle, on_alive=lambda: beat(redis)
+        exchange,
+        list(instrument_ids),
+        writer.handle,
+        on_alive=lambda: beat(redis),
+        on_reconnect=healer.request,
     )
+    heal_task = asyncio.create_task(healer.run())
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, service.stop)
     try:
         await service.run()
     finally:
+        heal_task.cancel()
+        await asyncio.gather(heal_task, return_exceptions=True)
+        await rest.aclose()
         await exchange.close()
         await redis.aclose()
         await engine.dispose()

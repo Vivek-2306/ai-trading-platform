@@ -32,6 +32,7 @@ class StreamService:
         handler: Handler,
         *,
         on_alive: Callable[[], Awaitable[None]] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
         timeframe: str = "1m",
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         initial_backoff: float = 1.0,
@@ -41,6 +42,7 @@ class StreamService:
         self._symbols = symbols
         self._handler = handler
         self._on_alive = on_alive
+        self._on_reconnect = on_reconnect
         self._timeframe = timeframe
         self._sleep = sleep
         self._initial_backoff = initial_backoff
@@ -71,6 +73,7 @@ class StreamService:
 
     async def _watch_forever(self, symbol: str) -> None:
         backoff = self._initial_backoff
+        dropped = False
         while not self._stopping.is_set():
             try:
                 rows = await self._exchange.watch_ohlcv(symbol, self._timeframe)
@@ -81,10 +84,16 @@ class StreamService:
                     error=type(exc).__name__,
                     retry_in=backoff,
                 )
+                dropped = True
                 await self._sleep(backoff)
                 backoff = min(backoff * 2, self._max_backoff)
                 continue
             backoff = self._initial_backoff  # a message arrived: the connection is healthy
+            if dropped:
+                dropped = False
+                logger.info("stream_reconnected", symbol=symbol)
+                if self._on_reconnect is not None:
+                    self._on_reconnect()  # candles may have been missed: ask for a gap check
             if self._on_alive is not None:
                 await self._on_alive()
             await self._handler(symbol, rows)

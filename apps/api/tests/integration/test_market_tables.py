@@ -432,3 +432,59 @@ def test_streamed_candles_are_stored_once_even_when_replayed(postgres_url: str) 
         return int(count.scalar_one())
 
     assert _run(postgres_url, work) == 3  # minutes 0, 1, 2: the forming minute 3 is not stored
+
+
+def test_a_simulated_stream_drop_is_healed_by_rest_backfill(postgres_url: str) -> None:
+    from structlog.testing import capture_logs
+
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles
+    from app.data.universe import InstrumentSpec
+    from app.data.update import update_instrument
+
+    _migrate(postgres_url)
+    start = datetime(2026, 4, 1, 10, 0, tzinfo=UTC)
+    now = start + timedelta(minutes=14, seconds=30)
+    full = [
+        RawCandle(
+            start + timedelta(minutes=i), Decimal(1), Decimal(2), Decimal(1), Decimal(2), Decimal(3)
+        )
+        for i in range(14)
+    ]
+    spec = InstrumentSpec("binance", "LTC/USDT", AssetClass.CRYPTO)
+
+    class Rest:
+        venue = "binance"
+
+        async def fetch_candles(
+            self, symbol: str, timeframe: object, since: datetime | None = None, limit: int = 500
+        ) -> list[RawCandle]:
+            return [c for c in full if since is None or c.ts >= since][:limit]
+
+        async def aclose(self) -> None:
+            return None
+
+    async def work(session: AsyncSession) -> tuple[int, int, int]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        instrument = await get_or_create_instrument(session, spec)
+        await session.commit()
+        # The stream stored minutes 0-4 and 9-13, then dropped for minutes 5-8.
+        stored = [c for c in full if c.ts.minute not in (5, 6, 7, 8)]
+        await insert_candles(session, instrument.id, Timeframe.M1, stored)
+        with capture_logs() as logs:
+            result = await update_instrument(
+                sessions, Rest(), spec, Timeframe.M1, now=now, lookback_days=1
+            )
+        logged = sum(1 for log in logs if log["event"] == "candle_gaps_found")
+        total = (
+            await session.execute(
+                text("SELECT count(*) FROM candles WHERE instrument_id = :i"), {"i": instrument.id}
+            )
+        ).scalar_one()
+        return result.new, logged, int(total)
+
+    new, gap_logs, total = _run(postgres_url, work)
+    assert new == 4  # minutes 5-8
+    assert gap_logs == 1  # the gap was logged
+    assert total == 14
