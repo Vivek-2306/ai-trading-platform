@@ -53,13 +53,23 @@ tickets and PRs and merges. Releases go `develop` → `main` by PR (first one at
 **Goal:** Next.js shell talking to the API through a typed client.
 
 - AITP-18 Next.js app in `apps/web` (TS strict)
-- AITP-19 Tailwind + shadcn/ui app shell, dark mode, phone width
+- AITP-19 Tailwind + shadcn/ui app shell: responsive (phone, tablet, desktop), modern glass UI (translucent blurred panels), dark mode
 - AITP-20 Biome + `tsc` + Vitest/Testing Library, wired into Turborepo
 - AITP-21 `packages/api-client` generated from OpenAPI; CI fails if stale
 - AITP-22 System status page (API, DB, Redis)
 - AITP-23 CI workflow: web job
+- AITP-36 Web env and logging: one root `.env` read by web and API (validated), pino logs with request IDs
+- AITP-37 ngrok dev tunnel: `pnpm tunnel` serves the web app at a public URL for phone and tablet checks
 
 **Out of scope:** real dashboards, charts, auth. Mobile app deferred.
+
+### Phase 4b — API reference, Postman and logging (`phase-4b-api-docs`)
+
+**Goal:** every API endpoint documented in Notion and Postman, and logs that are easy to search.
+
+- AITP-38 Notion "API Reference" database: one row per endpoint with method, path, auth, request, response, errors, status
+- AITP-39 Postman collection generated from the OpenAPI schema (`docs/api/`); CI fails if stale; new endpoints must update it
+- AITP-40 Logging hardening: request/response logs, redaction of secrets, rotating log files, optional Sentry hook (off by default)
 
 ### Phase 5 — Domain packages and dependency management (`phase-5-domain-deps`)
 
