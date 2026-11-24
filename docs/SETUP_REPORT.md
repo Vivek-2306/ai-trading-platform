@@ -12,7 +12,7 @@
 | 4. Web app skeleton | #4 | Next.js app with a responsive glass UI, status page, typed API client generated from OpenAPI, pino logs, phone tunnel, web CI |
 | 4b. API reference, Postman, logging | #5 | Notion API Reference, generated Postman collection, secret-safe logs, optional log file and Sentry |
 | 5. Domain packages | #6 | `analysis`, `ml`, `ai`, `markets` dependency groups with smoke tests; Dependabot |
-| 6. Quality gates, deploy base, release | #7 | Pre-commit hooks, secret scanning, production Compose stack, verified quickstart, full branch protection |
+| 6. Quality gates, deploy base, release | #12 | Pre-commit hooks, secret scanning, production Compose stack, verified quickstart, full branch protection |
 
 ## Numbers
 
