@@ -4,8 +4,8 @@
 
 ## Current phase
 
-**Setup phases 1–6 are all merged into `develop`** (PRs #1–#6, #12). Waiting on the v0.1.0 release
-(`develop` → `main`). No feature phase yet: needs the owner's product decisions. See `docs/SETUP_REPORT.md`.
+**v0.1.0 released 2026-11-24** (setup phases 1–6, PRs #1–#6, #12–#14). Feature phases 7 to 9b are
+planned in `docs/PLAN.md` (ADR 0003); none started. See `docs/SETUP_REPORT.md`.
 
 ## Last completed
 
@@ -59,25 +59,26 @@
 
 ## In progress
 
-Phase 6 merged (PR #12, 2026-11-24). Release v0.1.0 PR pending (AITP-35 stays In Review until tagged).
+Feature planning PR (phases 7 to 9b, ADR 0003) awaiting owner review.
 
 ## Next up
 
-1. Release v0.1.0: PR `develop` → `main` (merge commit), then tag `v0.1.0` (`/release-phase release v0.1.0`).
-3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`.
-4. Owner: answer the open product decisions below, then plan feature phases (`/plan-project`).
-5. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
+1. Owner reviews and merges the planning PR.
+2. Owner says "go" for Phase 7 (`/start-phase 7`): crypto and gold market data.
+3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
+4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
+5. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
 
-## Open questions (owner decisions)
+Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backtest → 9b scalping research → 10 ML → 11 news/AI → 12 paper trading.
 
-- [ ] Personal tool only, or a public product later? (drives SEBI registration + data licences)
-- [ ] MVP markets: Indian equities + crypto first?
-- [ ] Indian broker: Zerodha (Kite Connect), Upstox or Angel One?
-- [ ] MVP hosting: low-cost server or AWS from day one?
-- [ ] Monthly budget ceiling for the MVP.
-- [ ] Mobile app phase (proposed: after web signals + paper trading).
+## Owner decisions (answered 2026-11-24)
 
-These are needed before feature phases, not before setup Phases 1–6.
+- [x] Personal tool only (no SEBI registration or data resale concerns for now; revisit if it ever goes public).
+- [x] MVP market: crypto first; Indian markets later.
+- [x] Indian broker: undecided, not urgent (only needed when Indian markets start).
+- [x] Hosting: a single server is enough; develop everything on Docker with free tiers, move to cloud plans later.
+- [x] Budget: near zero during development (free tiers + local Docker); paid plans only when moving to a server.
+- [x] Mobile app: after the web app.
 
 ## Known issues
 
