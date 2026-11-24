@@ -57,6 +57,17 @@ async def _backtest(judge_oos: bool) -> int:
     return 0
 
 
+async def _report() -> int:
+    from app.ml.report import write_report
+
+    engine = create_async_engine(get_settings().database_url)
+    try:
+        print(await write_report(async_sessionmaker(engine, expire_on_commit=False)))  # noqa: T201
+    finally:
+        await engine.dispose()
+    return 0
+
+
 async def _main() -> int:
     engine = create_async_engine(get_settings().database_url)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
@@ -92,8 +103,10 @@ def main() -> None:
     sub.add_parser(
         "backtest", help="tuning region and walk-forward only; the locked period stays shut"
     )
+    sub.add_parser("report", help="write docs/ML_RESEARCH.md")
     args = parser.parse_args()
-    raise SystemExit(asyncio.run(_backtest(False) if args.command == "backtest" else _main()))
+    run = {"backtest": lambda: _backtest(False), "report": _report}.get(args.command, _main)
+    raise SystemExit(asyncio.run(run()))
 
 
 if __name__ == "__main__":

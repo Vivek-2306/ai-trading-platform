@@ -15,8 +15,8 @@ still unspent (owner decision pending, needed at AITP-85).
 Phase 10 status: AITP-81 to 84 done. On the tuning region the model does not beat the training base rate
 (AUC 0.50 to 0.56, Brier worse than the prior on BTC and ETH 1h and 1d), and 1h entries at p >= 0.50 hit the target
 38 to 41% of the time against a cost-adjusted break-even of 47 to 50%. Tuning backtests: 1h -16% (BTC), -25% (ETH);
-1d +6.6% / +2.6% on about 90 trades. AITP-85 (judge the locked swing period once) is **Needs Decision**: the owner
-chooses whether to spend the swing lock; recommendation is not to, because the model already fails on tuning data.
+1d +6.6% / +2.6% on about 90 trades. AITP-85: owner decided NOT to spend the swing lock (2026-11-24), so the model is not judged out of sample.
+AITP-86 report generated: **no-go** (`docs/ML_RESEARCH.md`). The swing lock remains unspent.
 
 ## Last completed
 

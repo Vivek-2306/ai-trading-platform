@@ -69,3 +69,26 @@ def test_calibration_never_uses_its_own_fold_or_unfinished_labels() -> None:
 
     assert np.isnan(calibrated[folds[0].test]).all()  # the first fold has nothing earlier
     assert np.isfinite(calibrated[folds[-1].test]).all()
+
+
+def _evaluation(brier: float, win: float, breakeven: float = 0.45):  # type: ignore[no-untyped-def]
+    from app.ml.evaluate import Evaluation
+
+    return Evaluation(
+        rows=1000, base_rate=0.4, auc=0.55, brier_model=brier, brier_calibrated=None,
+        brier_prior=0.24, brier_coin=0.25, ece_raw=0.02, ece_calibrated=None,
+        breakeven=breakeven, thresholds=[{"threshold": 0.5, "rows": 500, "win_rate": win}],
+    )  # fmt: skip
+
+
+def test_the_verdict_needs_both_the_baselines_and_the_break_even() -> None:
+    pytest.importorskip("sklearn")
+    from app.ml.report import verdict
+
+    good = {("BTC/USDT", "1h"): _evaluation(0.23, 0.50)}
+    weak = {("BTC/USDT", "1h"): _evaluation(0.25, 0.40)}
+
+    assert verdict(good) == (True, [])
+    ships, reasons = verdict(weak)
+    assert not ships and len(reasons) == 2
+    assert "not better than the base rate" in reasons[0] and "break-even" in reasons[1]
