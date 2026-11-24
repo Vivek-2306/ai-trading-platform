@@ -341,6 +341,11 @@
             "title": "Rule Version",
             "type": "string"
           },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          },
           "symbol": {
             "title": "Symbol",
             "type": "string"
@@ -730,7 +735,7 @@
     },
     "/signals": {
       "get": {
-        "description": "Signals, newest first. Filter by instrument, timeframe or action; page back with\n`next_before_id`. Research output, not financial advice.",
+        "description": "Signals, newest recorded first. Filter by instrument, timeframe or action; page back with\n`next_before_id`. Research output, not financial advice.",
         "operationId": "list_signals_signals_get",
         "parameters": [
           {

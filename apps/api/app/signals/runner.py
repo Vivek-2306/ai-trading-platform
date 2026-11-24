@@ -12,14 +12,15 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.analysis.features import compute_features
+from app.analysis.features import compute_features, latest
 from app.analysis.indicators import CandleSeries
 from app.core.logging import get_logger
 from app.data.adapters.base import RawCandle
+from app.data.gaps import find_gaps
 from app.data.models import Candle, Instrument, Signal, SignalAction, Timeframe
 from app.data.repository import record_signal
 from app.data.universe import InstrumentSpec
-from app.signals.rules import Decision, RuleConfig, evaluate
+from app.signals.rules import Decision, RuleConfig, evaluate, no_trade
 
 logger = get_logger(__name__)
 
@@ -101,7 +102,36 @@ async def run_signal(
                 newest=newest.isoformat(),
             )
             return None
-        decision = evaluate(compute_features(series), config)
+        step = timedelta(seconds=timeframe.seconds)
+        expected = (
+            datetime.fromtimestamp(
+                (int(now.timestamp()) // timeframe.seconds) * timeframe.seconds, tz=UTC
+            )
+            - step
+        )
+        if newest < expected:
+            # The candle that just closed is not stored yet (the update job is late). Skip: a
+            # signal about the previous candle would be old news; the next run catches up.
+            logger.warning(
+                "signal_skipped_late_candle",
+                symbol=spec.symbol,
+                timeframe=timeframe.value,
+                newest=newest.isoformat(),
+                expected=expected.isoformat(),
+            )
+            return None
+        features = compute_features(series)
+        gaps = find_gaps(series.times, spec.venue, timeframe, series.times[0], newest + step)
+        if gaps:
+            # Indicators assume consecutive candles; missing ones would distort them.
+            decision = no_trade(
+                "data_gap",
+                f"{sum(g.count for g in gaps)} candle(s) are missing from the recent history.",
+                "Gap in the data",
+                latest(features),
+            )
+        else:
+            decision = evaluate(features, config)
         stored = await record_signal(session, to_signal(instrument.id, timeframe, newest, decision))
     logger.info(
         "signal",

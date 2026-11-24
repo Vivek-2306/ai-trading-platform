@@ -1,5 +1,8 @@
 """Signals table, append-only (the database rejects UPDATE, DELETE and TRUNCATE).
 
+The triggers guard against mistakes and bugs. They are not a security boundary: the table's
+owner or a superuser can still disable them or drop the table.
+
 Revision ID: 0004
 Revises: 0003
 Create Date: 2026-11-24

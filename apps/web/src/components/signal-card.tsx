@@ -48,7 +48,9 @@ export function ActionBadge({ action }: { action: SignalAction }) {
 }
 
 export function formatCandleTime(iso: string): string {
-  return `${new Date(iso).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+  const time = new Date(iso);
+  if (Number.isNaN(time.getTime())) return "unknown time";
+  return `${time.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 /** One signal with its agreement score and the reasons behind it. */
@@ -63,12 +65,25 @@ export function SignalCard({ signal }: { signal: Signal }) {
             {signal.timeframe} candle · {formatCandleTime(signal.candle_ts)}
           </p>
         </div>
-        <ActionBadge action={signal.action} />
+        {signal.stale ? (
+          <span className="inline-flex whitespace-nowrap rounded-full bg-foreground/10 px-3 py-1 text-sm font-semibold text-muted">
+            STALE
+          </span>
+        ) : (
+          <ActionBadge action={signal.action} />
+        )}
       </div>
 
-      <div className="mt-4">
+      {signal.stale && (
+        <p role="note" className="mt-3 text-sm text-bad">
+          This signal is out of date (last action was {ACTION[signal.action].label}). The data feed
+          or the signal job may have stopped. Do not act on it.
+        </p>
+      )}
+
+      <div className={cn("mt-4", signal.stale && "opacity-50")}>
         <div className="flex justify-between text-sm text-muted">
-          <span>Agreement</span>
+          <span>Rule agreement with the leading side</span>
           <span className="tabular-nums">{agreement}%</span>
         </div>
         <div

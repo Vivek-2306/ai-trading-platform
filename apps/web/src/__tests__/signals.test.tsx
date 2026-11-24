@@ -52,6 +52,13 @@ describe("SignalCard", () => {
     expect(list[1]).toHaveTextContent("overbought");
   });
 
+  it("marks an out-of-date signal as stale instead of showing its action", () => {
+    render(<SignalCard signal={signal({ stale: true })} />);
+    expect(screen.getByText("STALE")).toBeInTheDocument();
+    expect(screen.queryByText("BUY", { selector: "span" })).not.toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent(/Do not act on it/);
+  });
+
   it("shows NO TRADE as a normal, labelled answer", () => {
     render(
       <SignalCard
@@ -81,6 +88,10 @@ describe("ActionBadge", () => {
 });
 
 describe("formatCandleTime", () => {
+  it("does not crash on a bad timestamp", () => {
+    expect(formatCandleTime("not a date")).toBe("unknown time");
+  });
+
   it("is always UTC", () => {
     expect(formatCandleTime("2026-11-24T08:00:00+00:00")).toBe("2026-11-24 08:00 UTC");
   });

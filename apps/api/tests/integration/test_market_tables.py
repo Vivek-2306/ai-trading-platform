@@ -1124,3 +1124,70 @@ def test_signals_endpoints_filter_page_and_show_latest(postgres_url: str, redis_
         ("SIGA/USDT", "1h"): "NO_TRADE",  # the newest candle, not the first stored
         ("SIGB/USDT", "1h"): "BUY",
     }
+
+
+def test_signal_run_skips_a_late_candle_and_flags_a_data_gap(postgres_url: str) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.signals.runner import run_signal
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(9)
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    spec = InstrumentSpec("binance", "GAPTEST/USDT", AssetClass.CRYPTO)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        price = 100.0
+        rows = []
+        for i in range(100):
+            price *= 1 + rng.normal(0, 0.01)
+            if i in (40, 41, 42):
+                continue  # three missing hourly candles
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        # Newest stored candle is hour 99; "now" is shortly after hour 99 closed: on time.
+        on_time = await run_signal(
+            sessions, spec, Timeframe.H1, now=start + timedelta(hours=100, minutes=10)
+        )
+        # An hour later the update job has not brought hour 100: the candle is late.
+        late = await run_signal(
+            sessions, spec, Timeframe.H1, now=start + timedelta(hours=101, minutes=10)
+        )
+        row = (
+            await session.execute(
+                text("SELECT action, reasons FROM signals WHERE instrument_id = :i"), {"i": iid}
+            )
+        ).one()
+        return {"on_time": on_time, "late": late, "row": row}
+
+    out = _run(postgres_url, work)
+    assert out["late"] is None  # skipped, nothing stored for a stale candle
+    on_time = out["on_time"]
+    assert on_time is not None and on_time.action.value == "NO_TRADE"  # type: ignore[attr-defined]
+    row = out["row"]
+    assert row.action == "NO_TRADE"  # type: ignore[attr-defined]
+    assert row.reasons[0]["code"] == "data_gap" and "3 candle" in row.reasons[0]["text"]  # type: ignore[attr-defined]

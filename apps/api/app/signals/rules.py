@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from app.analysis.features import FeatureTable, latest
+from app.analysis.features import SMA_SLOW, FeatureTable, latest
 from app.data.models import SignalAction
 
 RULE_VERSION = "rules-v1"
@@ -121,7 +121,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "above_sma",
-                    f"Price ({fmt(close)}) is above its {50}-candle average ({fmt(sma)}).",
+                    f"Price ({fmt(close)}) is above its {SMA_SLOW}-candle average ({fmt(sma)}).",
                     "buy",
                     1.0,
                 )
@@ -130,7 +130,7 @@ def _vote_rules(
             reasons.append(
                 Reason(
                     "below_sma",
-                    f"Price ({fmt(close)}) is below its {50}-candle average ({fmt(sma)}).",
+                    f"Price ({fmt(close)}) is below its {SMA_SLOW}-candle average ({fmt(sma)}).",
                     "sell",
                     1.0,
                 )
@@ -232,17 +232,27 @@ def _no_trade(
     )
 
 
+def no_trade(code: str, text: str, summary: str, inputs: dict[str, float | None]) -> Decision:
+    """A NO_TRADE decision decided outside the rules (for example a gap in the data)."""
+    return _no_trade([Reason(code, text, "info")], inputs, summary)
+
+
 def evaluate(table: FeatureTable, config: RuleConfig | None = None) -> Decision:
     """Decide for the newest candle in `table` (features from `compute_features`)."""
     cfg = config or RuleConfig()
     inputs = latest(table)
+    candles_used = len(table["close"])
     previous = (
         latest({name: values[:-1] for name, values in table.items()})
         if len(table["close"]) > 1
         else {}
     )
 
-    needed = ("ema_slow", "sma_slow", "rsi", "macd_hist", "atr_percent")
+    # Beyond the newest values, what the decision depends on (so it can be reproduced).
+    inputs["prev_macd_hist"] = previous.get("macd_hist")
+    inputs["candles_used"] = float(candles_used)
+
+    needed = ("close", "ema_slow", "sma_slow", "rsi", "macd_hist", "atr_percent")
     if any(inputs.get(n) is None for n in needed):
         return _no_trade(
             [Reason("warming_up", "Not enough history yet for every indicator.", "info")],
@@ -252,6 +262,12 @@ def evaluate(table: FeatureTable, config: RuleConfig | None = None) -> Decision:
 
     atr_percent = inputs["atr_percent"]
     assert atr_percent is not None
+    if atr_percent == 0:
+        return _no_trade(
+            [Reason("flat_market", "Price has not moved: a stuck feed or a dead market.", "info")],
+            inputs,
+            "Flat market",
+        )
     if atr_percent > cfg.max_atr_percent or math.isinf(atr_percent):
         return _no_trade(
             [

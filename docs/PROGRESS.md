@@ -85,6 +85,12 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 
 ## Known issues
 
+- Phase 8a limitations (deliberate, to revisit): the signals trigger guards against mistakes but the table owner
+  can still disable it (a non-owner app role would fix that); a candle corrected by the REST overwrite after its
+  signal was stored leaves that signal's inputs slightly out of step (rare; the close is stored for comparison);
+  `GET /signals` orders by recorded id, not candle time; rules-v1 thresholds are untested guesses until Phase 9
+  backtests measure them; a long uptrend often reads as NO TRADE because RSI/Bollinger rules disagree with trend.
+
 - Phase 7b limitations (deliberate, to revisit): quiet minutes on thin symbols (e.g. PAXG) have no 1m candle
   at all (Binance sends none), so the gap check reports them and the healer refetches them every 5 minutes;
   the stream heartbeat is global (one busy symbol keeps it fresh); the SSE stream limit is global (50), not

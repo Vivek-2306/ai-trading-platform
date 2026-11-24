@@ -248,3 +248,30 @@ def test_fmt_handles_small_and_mid_prices() -> None:
     assert fmt(1234567.891) == "1,234,567.89"
     assert fmt(2.5) == "2.5"
     assert fmt(0.000123456) == "0.000123456"
+
+
+def test_a_flat_market_is_no_trade_not_hold() -> None:
+    decision = evaluate(table(atr_percent=0.0, atr=0.0))
+
+    assert decision.action is SignalAction.NO_TRADE
+    assert codes(decision.reasons) == {"flat_market"}
+
+
+def test_infinite_values_count_as_not_available() -> None:
+    values = table()
+    values["rsi"] = np.array([50.0, np.inf])
+
+    decision = evaluate(values)
+
+    assert decision.action is SignalAction.NO_TRADE
+    assert codes(decision.reasons) == {"warming_up"}
+    assert decision.inputs["rsi"] is None  # a value the database can store
+
+
+def test_the_record_holds_what_is_needed_to_reproduce_the_decision() -> None:
+    values = table({"macd_hist": 0.1}, ema_fast=105.0, close=104.0, sma_slow=100.0, macd_hist=0.3)
+
+    decision = evaluate(values)
+
+    assert decision.inputs["prev_macd_hist"] == 0.1
+    assert decision.inputs["candles_used"] == 2.0

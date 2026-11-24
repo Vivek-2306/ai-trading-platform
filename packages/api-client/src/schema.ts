@@ -136,7 +136,7 @@ export interface paths {
         };
         /**
          * List signals
-         * @description Signals, newest first. Filter by instrument, timeframe or action; page back with
+         * @description Signals, newest recorded first. Filter by instrument, timeframe or action; page back with
          *     `next_before_id`. Research output, not financial advice.
          */
         get: operations["list_signals_signals_get"];
@@ -336,6 +336,11 @@ export interface components {
             reasons: components["schemas"]["ReasonOut"][];
             /** Rule Version */
             rule_version: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
             /** Symbol */
             symbol: string;
             /** Timeframe */

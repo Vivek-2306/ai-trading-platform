@@ -156,6 +156,8 @@ export type Signal = {
   inputs: Record<string, number | null>;
   rule_version: string;
   created_at: string;
+  /** The candle is old (the feed or the job stopped): do not act on this signal. */
+  stale?: boolean;
 };
 
 /** The newest signal per instrument and timeframe, or null if the API cannot answer. */

@@ -61,7 +61,7 @@ def latest(table: FeatureTable) -> dict[str, float | None]:
     out: dict[str, float | None] = {}
     for name, values in table.items():
         value = float(values[-1]) if len(values) else float("nan")
-        out[name] = None if np.isnan(value) else value
+        out[name] = value if np.isfinite(value) else None  # NaN and +-inf are "not available"
     return out
 
 

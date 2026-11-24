@@ -189,7 +189,7 @@
               ],
               "variable": []
             },
-            "description": "List signals\n\nSignals, newest first. Filter by instrument, timeframe or action; page back with\n`next_before_id`. Research output, not financial advice.\n\nDocumented responses: 200, 422"
+            "description": "List signals\n\nSignals, newest recorded first. Filter by instrument, timeframe or action; page back with\n`next_before_id`. Research output, not financial advice.\n\nDocumented responses: 200, 422"
           }
         },
         {

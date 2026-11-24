@@ -1,6 +1,6 @@
 """Signal endpoints (read-only: signals are appended by the signal job, never edited)."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from app.core.database import SessionDep
 from app.data.models import Instrument, Signal, SignalAction, Timeframe
+from app.signals.runner import STALE_AFTER_CANDLES
 
 router = APIRouter(prefix="/signals", tags=["signals"])
 
@@ -35,6 +36,8 @@ class SignalOut(BaseModel):
     inputs: dict[str, Any]
     rule_version: str
     created_at: datetime
+    # True when the candle this signal is about is old (feed or job stopped): do not act on it.
+    stale: bool = False
 
 
 class SignalsResponse(BaseModel):
@@ -43,7 +46,9 @@ class SignalsResponse(BaseModel):
     next_before_id: int | None
 
 
-def _out(signal: Signal, instrument: Instrument) -> SignalOut:
+def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) -> SignalOut:
+    now = now or datetime.now(UTC)
+    seconds = Timeframe(signal.timeframe).seconds
     return SignalOut(
         id=signal.id,
         instrument_id=signal.instrument_id,
@@ -57,6 +62,7 @@ def _out(signal: Signal, instrument: Instrument) -> SignalOut:
         inputs=signal.inputs,
         rule_version=signal.rule_version,
         created_at=signal.created_at,
+        stale=(now - signal.candle_ts).total_seconds() > seconds * STALE_AFTER_CANDLES,
     )
 
 
@@ -69,7 +75,7 @@ async def list_signals(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     before_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> SignalsResponse:
-    """Signals, newest first. Filter by instrument, timeframe or action; page back with
+    """Signals, newest recorded first. Filter by instrument, timeframe or action; page back with
     `next_before_id`. Research output, not financial advice."""
     statement = (
         select(Signal, Instrument)
