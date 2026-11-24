@@ -44,7 +44,6 @@ On macOS also `brew install libomp` (LightGBM) and `brew install gitleaks` (comm
 
 ```bash
 git clone https://github.com/Vivek-2306/ai-trading-platform.git && cd ai-trading-platform
-git checkout develop
 cp .env.example .env     # optional: the defaults already work for local development
 pnpm bootstrap           # installs JS + Python packages and the git hooks
 pnpm infra:up            # Postgres + TimescaleDB + pgvector and Redis (Docker)
@@ -69,7 +68,7 @@ pnpm tunnel                                                            # public 
 | `pnpm api:postman` | regenerate the Postman collection after an API change |
 | `pnpm --filter @aitp/api-client generate` | regenerate the typed web client after an API change |
 | `pnpm infra:up` / `infra:down` | start / stop the local database and Redis |
-| `pnpm stack:up` / `stack:down` | the full production stack on one server (see `infra/prod.env.example`) |
+| `pnpm stack:up` / `stack:down` | the full production stack on one server. First `cp infra/prod.env.example infra/prod.env` and fill it in |
 
 ## Docs
 

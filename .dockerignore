@@ -12,3 +12,6 @@ private
 **/.ruff_cache
 **/.mypy_cache
 apps/api/data
+infra/*.env
+**/*.env
+**/secrets/
