@@ -28,3 +28,15 @@ def test_instrument_id_must_be_positive(client: TestClient) -> None:
     response = client.get("/data/candles", params={"instrument_id": 0, "timeframe": "1h"})
 
     assert response.status_code == 422
+
+
+def test_signals_filters_are_validated(client: TestClient) -> None:
+    for params in (
+        {"timeframe": "7m"},
+        {"action": "MAYBE"},
+        {"limit": 0},
+        {"limit": 201},
+        {"instrument_id": 0},
+        {"before_id": 0},
+    ):
+        assert client.get("/signals", params=params).status_code == 422, params

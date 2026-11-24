@@ -155,6 +155,82 @@
       ]
     },
     {
+      "name": "signals",
+      "item": [
+        {
+          "name": "List signals",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/signals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "signals"
+              ],
+              "variable": []
+            },
+            "description": "List signals\n\nSignals, newest first. Filter by instrument, timeframe or action; page back with\n`next_before_id`. Research output, not financial advice.\n\nDocumented responses: 200, 422"
+          }
+        },
+        {
+          "name": "Latest signal per instrument and timeframe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/signals/latest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "signals",
+                "latest"
+              ],
+              "variable": []
+            },
+            "description": "Latest signal per instrument and timeframe\n\nThe newest signal for every instrument and timeframe that has one.\n\nDocumented responses: 200"
+          }
+        }
+      ]
+    },
+    {
       "name": "system",
       "item": [
         {

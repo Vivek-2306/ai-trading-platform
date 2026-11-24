@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import data, health, stream
+from app.api import data, health, signals, stream
 from app.api.errors import register_error_handlers
 from app.api.middleware import RequestContextMiddleware
 from app.core.config import Settings, get_settings
@@ -79,4 +79,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(data.router)
     app.include_router(stream.router)
+    app.include_router(signals.router)
     return app

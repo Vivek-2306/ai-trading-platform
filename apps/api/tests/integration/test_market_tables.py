@@ -1036,3 +1036,91 @@ def test_signal_task_survives_a_failing_instrument(
     monkeypatch.setattr(tasks, "run_signal", flaky)
 
     assert tasks.run_signals.apply().get() == {}  # nothing stored, and no exception escaped
+
+
+def test_signals_endpoints_filter_page_and_show_latest(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.data.models import AssetClass, Signal
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+
+    _migrate(postgres_url)
+    base = datetime(2026, 9, 1, tzinfo=UTC)
+
+    def sig(iid: int, tf: str, hours: int, action: str) -> Signal:
+        return Signal(
+            instrument_id=iid,
+            timeframe=tf,
+            candle_ts=base + timedelta(hours=hours),
+            action=action,
+            confidence=Decimal("0.6"),
+            reasons=[{"code": "trend_up", "text": "Uptrend.", "direction": "buy", "weight": 2.0}],
+            inputs={"rsi": 55.0},
+            rule_version="rules-v1",
+        )
+
+    async def seed(session: AsyncSession) -> tuple[int, int]:
+        a = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "SIGA/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        b = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "SIGB/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        await session.commit()
+        for hours, action in enumerate(["BUY", "HOLD", "SELL", "NO_TRADE"]):
+            await record_signal(session, sig(a, "1h", hours, action))
+        await record_signal(session, sig(a, "1d", 0, "HOLD"))
+        await record_signal(session, sig(b, "1h", 0, "BUY"))
+        return a, b
+
+    a, _b = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    with TestClient(create_app(settings)) as client:
+        mine = client.get("/signals", params={"instrument_id": a, "timeframe": "1h"}).json()
+        page1 = client.get(
+            "/signals", params={"instrument_id": a, "timeframe": "1h", "limit": 3}
+        ).json()
+        page2 = client.get(
+            "/signals",
+            params={
+                "instrument_id": a,
+                "timeframe": "1h",
+                "limit": 3,
+                "before_id": page1["next_before_id"],
+            },
+        ).json()
+        sells = client.get("/signals", params={"instrument_id": a, "action": "SELL"}).json()
+        latest = client.get("/signals/latest").json()
+
+    assert [s["action"] for s in mine["signals"]] == [
+        "NO_TRADE",
+        "SELL",
+        "HOLD",
+        "BUY",
+    ]  # newest first
+    assert mine["next_before_id"] is None
+    first = mine["signals"][0]
+    assert first["symbol"] == "SIGA/USDT" and first["confidence"] == "0.6000"
+    assert first["reasons"][0]["code"] == "trend_up" and first["inputs"] == {"rsi": 55.0}
+    assert [s["action"] for s in page1["signals"]] == ["NO_TRADE", "SELL", "HOLD"]
+    assert [s["action"] for s in page2["signals"]] == ["BUY"] and page2["next_before_id"] is None
+    assert [s["action"] for s in sells["signals"]] == ["SELL"]
+    mine_latest = {
+        (s["symbol"], s["timeframe"]): s["action"]
+        for s in latest
+        if s["symbol"] in {"SIGA/USDT", "SIGB/USDT"}
+    }
+    assert mine_latest == {
+        ("SIGA/USDT", "1d"): "HOLD",
+        ("SIGA/USDT", "1h"): "NO_TRADE",  # the newest candle, not the first stored
+        ("SIGB/USDT", "1h"): "BUY",
+    }
