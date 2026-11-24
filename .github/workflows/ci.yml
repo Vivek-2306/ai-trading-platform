@@ -134,7 +134,10 @@ jobs:
 
       # A missing or broken package fails here instead of being skipped.
       - name: Import smoke tests
-        run: uv run pytest tests/test_packages.py --no-cov
+        run: |
+          uv run pytest tests/test_packages.py --no-cov -q | tee smoke.txt
+          # Nothing may be skipped: a skip here would hide a missing package.
+          if grep -q skipped smoke.txt; then echo "tests were skipped"; exit 1; fi
         env:
           REQUIRE_ALL_PACKAGES: "1"
           MLFLOW_DISABLE_TELEMETRY: "true"

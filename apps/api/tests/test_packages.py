@@ -152,9 +152,3 @@ def test_every_declared_dependency_has_a_smoke_test() -> None:
             if IMPORT_NAMES.get(dist, dist.replace("-", "_")) not in tested:
                 missing.append(f"{group}: {dist}")
     assert not missing, f"add to GROUPS: {missing}"
-
-
-@pytest.mark.skipif(os.environ.get("CI") != "true", reason="only enforced on CI")
-def test_ci_requires_every_package() -> None:
-    """Guards the guarantee above: on CI, a missing package must fail, never skip."""
-    assert REQUIRED, "set REQUIRE_ALL_PACKAGES=1 for the CI step that runs these tests"
