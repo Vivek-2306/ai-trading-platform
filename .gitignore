@@ -19,6 +19,7 @@ mlruns/
 # Node / Next.js / Expo
 node_modules/
 .next/
+.next-tunnel/
 out/
 .turbo/
 .expo/
