@@ -11,7 +11,7 @@ const NAV = [
 /** Top bar on every size; the nav moves to a bottom bar on phones. */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-24 sm:pb-8">
+    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
       <header className="glass sticky top-3 z-10 mt-3 flex items-center justify-between rounded-2xl px-4 py-2">
         <Link href="/" className="font-semibold tracking-tight">
           AI Trading <span className="text-accent">Platform</span>

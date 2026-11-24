@@ -2,6 +2,7 @@ import { createApiClient } from "@aitp/api-client";
 import { headers } from "next/headers";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { safeRequestId } from "@/lib/proxy-target";
 
 /** Server-side client: talks to the API directly (the browser goes through /api). */
 export function serverApi() {
@@ -20,7 +21,7 @@ export type SystemStatus =
 
 export async function getSystemStatus(): Promise<SystemStatus> {
   const client = serverApi();
-  const requestId = (await headers()).get("x-request-id") ?? undefined;
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
   const init = {
     cache: "no-store" as const,
     headers: requestId ? { "x-request-id": requestId } : {},
