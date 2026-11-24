@@ -8,6 +8,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Indicator library (`app/analysis/indicators.py`, TA-Lib): SMA, EMA, RSI, MACD, ATR, Bollinger bands and a rolling VWAP. Warm-up values are NaN, never invented; tested against independent long-hand implementations. `ta-lib` and `numpy` are now runtime dependencies (AITP-55).
 - Live stream service (`pnpm stream`, `python -m app.stream`): follows Binance 1-minute candles over WebSocket for every tracked Binance instrument, reconnects with growing backoff, stops promptly on SIGTERM, and refreshes a Redis heartbeat that the new `stream` container health check reads (AITP-49).
 - Stream candles are stored: the forming 1m candle goes to Redis (`live:binance:<symbol>:1m` plus a pub/sub channel) and each closed candle is written to TimescaleDB once its final values have arrived; a candle cut short by a disconnect is skipped for the REST backfill. Verified identical to Binance REST for live BTC/USDT candles (AITP-50).
 - Stream gap healing: the stream service refetches the last day of 1m candles over REST at startup, after every reconnect and every 5 minutes, logs and refills any holes (including candles cut short by a disconnect) (AITP-51).
