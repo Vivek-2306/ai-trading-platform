@@ -18,7 +18,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
         <nav aria-label="Main" className="hidden items-center gap-1 sm:flex">
           {NAV.map(({ href, label }) => (
-            <Link key={href} href={href} className="rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground">
+            <Link
+              key={href}
+              href={href}
+              className="rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground"
+            >
               {label}
             </Link>
           ))}
@@ -31,7 +35,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="glass fixed inset-x-3 bottom-3 z-10 flex justify-around rounded-2xl p-1 sm:hidden"
       >
         {NAV.map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs text-muted">
+          <Link
+            key={href}
+            href={href}
+            className="flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs text-muted"
+          >
             <Icon size={18} />
             {label}
           </Link>
