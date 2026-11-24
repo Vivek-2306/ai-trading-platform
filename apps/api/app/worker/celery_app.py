@@ -53,6 +53,11 @@ def create_celery(settings: Settings) -> Celery:
                 "schedule": crontab(hour=3, minute=30),
             },
             # Two minutes past each hour, once the exchange has published the closed candle.
+            # Ten minutes past each hour: after the candle update has finished.
+            "run-signals": {
+                "task": "app.worker.tasks.run_signals",
+                "schedule": crontab(minute=10),
+            },
             "update-candles": {
                 "task": "app.worker.tasks.update_candles",
                 "schedule": crontab(minute=2),

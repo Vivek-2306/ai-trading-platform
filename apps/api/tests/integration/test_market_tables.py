@@ -925,3 +925,114 @@ def test_signals_are_append_only(postgres_url: str) -> None:
         {"rsi": 25.0},
     )  # untouched by the blocked update
     assert out["bad_action"] == out["bad_confidence"] == "rejected"
+
+
+def test_signal_run_stores_one_signal_per_candle(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.signals.runner import run_signal
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(5)
+    start = datetime(2026, 8, 1, tzinfo=UTC)
+    price = 100.0
+    rows = []
+    spec = InstrumentSpec(
+        "binance", "SIGTEST/USDT", AssetClass.CRYPTO
+    )  # not shared with other tests
+
+    async def seed(session: AsyncSession) -> int:
+        nonlocal price
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        for i in range(120):
+            price *= 1 + rng.normal(0.0005, 0.01)
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+    now = start + timedelta(hours=120, minutes=10)  # just after the last candle closed
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        first = await run_signal(sessions, spec, Timeframe.H1, now=now)
+        second = await run_signal(sessions, spec, Timeframe.H1, now=now)
+        stale = await run_signal(sessions, spec, Timeframe.H1, now=now + timedelta(days=3))
+        none_for_unknown = await run_signal(
+            sessions,
+            InstrumentSpec("binance", "NOPE/USDT", AssetClass.CRYPTO),
+            Timeframe.H1,
+            now=now,
+        )
+        row = (
+            await session.execute(
+                text(
+                    "SELECT count(*) AS n, min(candle_ts) AS ts, min(action) AS action, "
+                    "min(rule_version) AS version, "
+                    "bool_and(jsonb_array_length(reasons) > 0) AS explained, "
+                    "bool_and(inputs ? 'rsi') AS has_inputs "
+                    "FROM signals WHERE instrument_id = :i"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        return {
+            "first": first,
+            "second": second,
+            "stale": stale,
+            "unknown": none_for_unknown,
+            "row": row,
+        }
+
+    out = _run(postgres_url, work)
+    last_candle = start + timedelta(hours=119)
+    first, second = out["first"], out["second"]
+    assert first is not None and second is not None
+    assert (first.stored, second.stored) == (True, False)  # type: ignore[attr-defined]
+    assert first.candle_ts == last_candle  # type: ignore[attr-defined]
+    assert out["stale"] is None  # data lagging: no signal about an old candle
+    assert out["unknown"] is None
+    row = out["row"]
+    assert row.n == 1 and row.ts == last_candle  # type: ignore[attr-defined]
+    assert row.version == "rules-v1" and row.explained and row.has_inputs  # type: ignore[attr-defined]
+
+
+def test_signal_task_survives_a_failing_instrument(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import Settings
+    from app.data.universe import InstrumentSpec
+    from app.worker import tasks
+
+    _migrate(postgres_url)
+    monkeypatch.setattr(
+        tasks, "get_settings", lambda: Settings(_env_file=None, database_url=postgres_url)
+    )
+
+    async def flaky(sessions: object, spec: InstrumentSpec, timeframe: object) -> None:
+        if spec.symbol == "ETH/USDT":
+            raise RuntimeError("boom")
+        return None
+
+    monkeypatch.setattr(tasks, "run_signal", flaky)
+
+    assert tasks.run_signals.apply().get() == {}  # nothing stored, and no exception escaped

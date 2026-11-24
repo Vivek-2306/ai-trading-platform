@@ -16,6 +16,7 @@ from app.data.repository import get_or_create_instrument, insert_candles
 from app.data.retention import delete_old_minute_candles
 from app.data.universe import InstrumentSpec, default_universe
 from app.data.update import update_instrument
+from app.signals.runner import run_signal
 from app.worker.celery_app import celery_app
 
 logger = get_logger(__name__)
@@ -118,3 +119,35 @@ async def _retention() -> int:
 def apply_candle_retention() -> int:
     """Delete 1m candles older than CANDLE_1M_RETENTION_DAYS. Safe to run twice."""
     return asyncio.run(_retention())
+
+
+SIGNAL_TIMEFRAMES = (Timeframe.H1, Timeframe.D1)
+
+
+async def _run_signals() -> dict[str, str]:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    out: dict[str, str] = {}
+    try:
+        for spec in default_universe(twelve_data_enabled=settings.twelve_data_api_key is not None):
+            for timeframe in SIGNAL_TIMEFRAMES:
+                key = f"{spec.venue}:{spec.symbol}:{timeframe.value}"
+                try:
+                    result = await run_signal(sessions, spec, timeframe)
+                except Exception:
+                    # One failing instrument must not stop the others.
+                    logger.exception("signal_run_failed", instrument=key)
+                    continue
+                if result is not None:
+                    out[key] = result.action.value
+    finally:
+        await engine.dispose()
+    return out
+
+
+# Safe to run twice: one signal is stored per instrument, timeframe and candle.
+@celery_app.task(name="app.worker.tasks.run_signals", ignore_result=True)
+def run_signals() -> dict[str, str]:
+    """Produce a signal for the newest closed candle of every tracked instrument."""
+    return asyncio.run(_run_signals())
