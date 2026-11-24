@@ -95,6 +95,12 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 
 ## Known issues
 
+- Phase 9b limitations (deliberate, review-found): the backtest cooldown starts at the exit candle's open time
+  (about one candle shorter than configured); the daily trade cap counts an entry on its fill candle's UTC day
+  but checks on the decision candle's day (can exceed by one at midnight); the code fingerprint omits
+  `backtest/costs.py`, `risk/limits.py` and `scalping/research.py`. Not changed, because the scalping locks are spent
+  and the result (no-go) is far from any of these margins.
+
 - Phase 8a limitations (deliberate, to revisit): the signals trigger guards against mistakes but the table owner
   can still disable it (a non-owner app role would fix that); a candle corrected by the REST overwrite after its
   signal was stored leaves that signal's inputs slightly out of step (rare; the close is stored for comparison);

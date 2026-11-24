@@ -24,7 +24,9 @@ def judge(metrics: dict[str, Any]) -> Verdict:
     failures: list[str] = []
     trades = int(metrics.get("trades") or 0)
     net = float(metrics.get("total_return_pct") or 0.0)
-    pf = float(metrics.get("profit_factor") or 0.0)
+    raw_pf = metrics.get("profit_factor")
+    # No losing trades at all stores no profit factor (it would be infinite): that is not a failure.
+    pf = float("inf") if raw_pf is None and trades > 0 else float(raw_pf or 0.0)
     if trades < MIN_TRADES:
         failures.append(f"only {trades} trades (need {MIN_TRADES})")
     if net <= 0:

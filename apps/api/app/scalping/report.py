@@ -55,18 +55,28 @@ async def write_report(sessions: async_sessionmaker[AsyncSession]) -> str:
             f"{drag.get('avg_gross_bps_per_trade')} | {drag.get('avg_fee_bps_per_trade')} | "
             f"{'PASS' if v.passed else 'fail: ' + '; '.join(v.failures)} |"
         )
+    best = (
+        max(float((d or {}).get("avg_gross_bps_per_trade") or 0) for *_, d, _ in rows)
+        if rows
+        else 0.0
+    )
     goes_on = [s for s, per in verdicts.items() if per and strategy_goes_on(per)]
     lines += ["", "## Verdict", ""]
+    complete = len(rows) == len(STRATEGIES) * 4
     if goes_on:
         lines.append(
             "Pass the rules (still only paper trading next, never live): " + ", ".join(goes_on)
+        )
+    elif not complete:
+        lines.append(
+            f"INCOMPLETE: only {len(rows)} of {len(STRATEGIES) * 4} combinations were judged."
         )
     else:
         lines += [
             "**NO-GO. No scalping strategy passes. None moves to paper trading.**",
             "",
             "Costs are not the whole story: a round trip costs about 20 bps at the regular fee,",
-            "but the average move per trade is already about zero or negative BEFORE fees, so the",
+            f"but the best average move before fees is {best:.1f} bps per trade, so the",
             "signals themselves have no edge on this data. Cheaper fee tiers (stored tuning",
             "runs) shrink the losses but none turns them positive. Simple moving-average, VWAP",
             "and breakout rules on 1m/5m BTC and ETH candles are not worth taking further.",

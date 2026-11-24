@@ -31,7 +31,7 @@ to paper trading only if it passes on both instruments on the same timeframe.
 **NO-GO. No scalping strategy passes. None moves to paper trading.**
 
 Costs are not the whole story: a round trip costs about 20 bps at the regular fee,
-but the average move per trade is already about zero or negative BEFORE fees, so the
+but the best average move before fees is 1.5 bps per trade, so the
 signals themselves have no edge on this data. Cheaper fee tiers (stored tuning
 runs) shrink the losses but none turns them positive. Simple moving-average, VWAP
 and breakout rules on 1m/5m BTC and ETH candles are not worth taking further.

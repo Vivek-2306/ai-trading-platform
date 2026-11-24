@@ -23,3 +23,8 @@ def test_a_strategy_needs_both_instruments_on_the_same_timeframe() -> None:
     assert strategy_goes_on({("BTC", "5m"): ok, ("ETH", "5m"): ok, ("BTC", "1m"): bad})
     assert not strategy_goes_on({("BTC", "5m"): ok, ("ETH", "5m"): bad})
     assert not strategy_goes_on({("BTC", "5m"): ok})  # one instrument is not enough
+
+
+def test_no_losing_trades_is_not_a_failed_profit_factor() -> None:
+    assert judge({"trades": 40, "total_return_pct": 2.0, "profit_factor": None}).passed
+    assert not judge({"trades": 0, "total_return_pct": 0, "profit_factor": None}).passed
