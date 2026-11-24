@@ -44,7 +44,7 @@ done
 
 echo
 echo "Open on your phone or tablet:  $url"
-echo "Only /, /status and the /api health + version endpoints are reachable. Logs: $LOGDIR"
+echo "Reachable: /, /charts, /status, and the /api health, version and live-stream endpoints. Logs: $LOGDIR"
 echo "The link is public while this runs. Press Ctrl+C to stop."
 # macOS ships bash 3.2 (no `wait -n`): poll until either process dies.
 while kill -0 "${pids[0]}" 2>/dev/null && kill -0 "${pids[1]}" 2>/dev/null; do sleep 2; done
