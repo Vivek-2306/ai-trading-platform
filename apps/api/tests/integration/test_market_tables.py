@@ -302,3 +302,76 @@ def test_quality_endpoint_reports_per_instrument(postgres_url: str, redis_url: s
     assert ("PAXG/USDT", "1d") in keys
     assert ("XAU/USD", "1h") not in keys  # no Twelve Data key set
     assert body["ok"] is False  # nothing loaded in this fresh database
+
+
+def test_instruments_and_candles_endpoints(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+
+    _migrate(postgres_url)
+    base = datetime(2026, 2, 1, tzinfo=UTC)
+    candles = [
+        RawCandle(
+            base + timedelta(hours=i),
+            Decimal("100.1234567891"),
+            Decimal(2) + i,
+            Decimal(1),
+            Decimal(2),
+            Decimal(3),
+        )
+        for i in range(10)
+    ]
+
+    async def seed(session: AsyncSession) -> int:
+        spec = InstrumentSpec("binance", "DOGE/USDT", AssetClass.CRYPTO)
+        instrument = await get_or_create_instrument(session, spec)
+        await insert_candles(session, instrument.id, Timeframe.H1, candles)
+        return instrument.id
+
+    instrument_id = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    with TestClient(create_app(settings)) as client:
+        listing = client.get("/data/instruments").json()
+        page1 = client.get(
+            "/data/candles", params={"instrument_id": instrument_id, "timeframe": "1h", "limit": 4}
+        ).json()
+        page2 = client.get(
+            "/data/candles",
+            params={
+                "instrument_id": instrument_id,
+                "timeframe": "1h",
+                "limit": 4,
+                "before": page1["next_before"],
+            },
+        ).json()
+        last = client.get(
+            "/data/candles",
+            params={
+                "instrument_id": instrument_id,
+                "timeframe": "1h",
+                "limit": 4,
+                "before": page2["next_before"],
+            },
+        ).json()
+        missing = client.get("/data/candles", params={"instrument_id": 99999, "timeframe": "1h"})
+
+    assert any(i["symbol"] == "DOGE/USDT" and i["id"] == instrument_id for i in listing)
+    # Newest four first page, oldest-first inside the page.
+    assert [c["ts"][:13] for c in page1["candles"]] == [
+        "2026-02-01T06",
+        "2026-02-01T07",
+        "2026-02-01T08",
+        "2026-02-01T09",
+    ]
+    assert page1["candles"][0]["open"] == "100.1234567891"  # exact decimal string
+    assert len(page2["candles"]) == 4 and page2["candles"][-1]["ts"][:13] == "2026-02-01T05"
+    assert len(last["candles"]) == 2 and last["next_before"] is None
+    assert missing.status_code == 404

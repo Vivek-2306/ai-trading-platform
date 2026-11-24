@@ -9,6 +9,78 @@
       "name": "data",
       "item": [
         {
+          "name": "List candles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/data/candles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "data",
+                "candles"
+              ],
+              "variable": []
+            },
+            "description": "List candles\n\nThe newest `limit` candles (oldest first). Page back in time with `next_before`.\n\nDocumented responses: 200, 404, 422"
+          }
+        },
+        {
+          "name": "List instruments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/data/instruments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "data",
+                "instruments"
+              ],
+              "variable": []
+            },
+            "description": "List instruments\n\nEvery instrument we hold candles for, ordered by venue and symbol.\n\nDocumented responses: 200"
+          }
+        },
+        {
           "name": "Data-quality report",
           "event": [
             {

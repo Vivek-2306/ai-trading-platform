@@ -14,6 +14,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Historical backfill: `backfill_candles` Celery task loads N years for an instrument and timeframe page by page, logs progress, and is safe to re-run (existing candles are skipped). Default instrument list in `app/data/universe.py` (AITP-44).
 - Hourly `update_candles` job (Celery beat, 2 minutes past the hour): fetches new candles for every tracked instrument, finds holes in the last 30 days and refills them. Market-hours aware: spot gold's weekend closure is not a gap, while crypto never closes. One failing instrument does not stop the rest (AITP-45).
 - `GET /data/quality`: per instrument and timeframe, missing candles, stale data, inconsistent candles and price spikes over the last 30 days, shown on the web status page. Postman collection and typed web client regenerated (AITP-46).
+- `GET /data/instruments` and `GET /data/candles` (newest-first paging with `before` / `next_before`, up to 1000 per page, prices as exact decimal strings) (AITP-47).
 
 ## [0.1.0] - 2026-11-24
 
