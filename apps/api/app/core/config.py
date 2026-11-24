@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     app_name: str = "trading-api"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["debug", "info", "warning", "error"] = "info"
+    # Optional rotating JSON log file (e.g. logs/api.log). Off by default.
+    log_file: str | None = None
+    # Optional error reporting. Off unless set; no personal data is sent.
+    sentry_dsn: str | None = None
     trading_mode: Literal["paper", "live"] = "paper"
 
     api_host: str = "127.0.0.1"

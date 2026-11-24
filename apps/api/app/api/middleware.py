@@ -43,5 +43,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
-            logger.info("request", status=status, duration_ms=duration_ms)
+            # Probes hit health endpoints every few seconds: keep them out of normal logs.
+            log = logger.debug if request.url.path.startswith("/health") else logger.info
+            log("request", status=status, duration_ms=duration_ms)
             structlog.contextvars.clear_contextvars()

@@ -54,7 +54,7 @@ def test_replaces_invalid_incoming_request_id(bad: str) -> None:
 
 def test_request_is_logged_with_its_id(client: TestClient) -> None:
     with capture_logs() as logs:
-        response = client.get("/health", headers={"X-Request-ID": "log-me"})
+        response = client.get("/version", headers={"X-Request-ID": "log-me"})
 
     entry = next(log for log in logs if log["event"] == "request")
     assert entry["status"] == 200
@@ -128,3 +128,11 @@ def test_request_context_is_cleared_after_request(client: TestClient) -> None:
     client.get("/health", headers={"X-Request-ID": "leaky"})
 
     assert structlog.contextvars.get_contextvars() == {}
+
+
+def test_health_probes_are_not_logged_at_info(client: TestClient) -> None:
+    with capture_logs() as logs:
+        client.get("/health")
+        client.get("/health/ready")
+
+    assert not [log for log in logs if log["event"] == "request"]

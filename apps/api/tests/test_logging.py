@@ -2,6 +2,7 @@
 
 import json
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -65,3 +66,42 @@ def test_uvicorn_access_log_is_silenced(capsys: pytest.CaptureFixture[str]) -> N
 
     captured = capsys.readouterr()
     assert "GET /health" not in captured.out + captured.err
+
+
+def test_secret_fields_are_redacted_at_any_depth(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(Settings(_env_file=None, app_env="production"))
+
+    get_logger("test").info(
+        "login", password="hunter2", user={"name": "a", "API_Key": "k-123"}, path="/x"
+    )
+
+    out = capsys.readouterr().out
+    assert "hunter2" not in out
+    assert "k-123" not in out
+    record = json.loads(out.strip().splitlines()[-1])
+    assert record["password"] == "[redacted]"
+    assert record["user"] == {"name": "a", "API_Key": "[redacted]"}
+    assert record["path"] == "/x"
+
+
+def test_log_file_gets_json_lines_when_configured(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    log_file = tmp_path / "logs" / "api.log"
+    configure_logging(Settings(_env_file=None, app_env="development", log_file=str(log_file)))
+
+    get_logger("test").info("to_file", token="abc", n=1)
+    logging.getLogger("uvicorn.error").warning("from_stdlib")
+    capsys.readouterr()
+
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    events = {line["event"]: line for line in lines}
+    assert events["to_file"]["n"] == 1
+    assert events["to_file"]["token"] == "[redacted]"
+    assert "from_stdlib" in events
+
+
+def test_no_log_file_by_default(tmp_path: Path) -> None:
+    configure_logging(Settings(_env_file=None))
+
+    assert not logging.getLogger("aitp.logfile").handlers
