@@ -28,3 +28,14 @@ the same ID shows up in the web log and the API log.
 
 pino: readable in development, JSON in production. Secrets (`token`, `password`, `authorization`, …)
 are redacted.
+
+## Open it on a phone or tablet
+
+```bash
+cd apps/api && uv run uvicorn app.main:create_app --factory   # the API, in one terminal
+pnpm tunnel                                                    # the web app + ngrok, in another
+```
+
+It prints a public `https://….ngrok-free.dev` link. Open it on the device (the laptop must stay on).
+The first visit shows ngrok's "Visit site" page; tap through it. Ctrl+C stops everything. The link
+is public while it runs, so stop it when you are done. One-time setup: `ngrok config add-authtoken <token>`.

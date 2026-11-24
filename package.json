@@ -21,7 +21,8 @@
     "db:migrate": "pnpm --filter @aitp/api db:migrate",
     "worker": "pnpm --filter @aitp/api worker",
     "beat": "pnpm --filter @aitp/api beat",
-    "test:integration": "pnpm --filter @aitp/api test:integration"
+    "test:integration": "pnpm --filter @aitp/api test:integration",
+    "tunnel": "bash scripts/tunnel.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.8",
