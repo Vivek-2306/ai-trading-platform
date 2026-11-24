@@ -4,10 +4,10 @@
 
 ## Current phase
 
-**Phase 8a — Indicators and rule signals** on `phase-8a-signals` (AITP-55 … 61). Phases 7 and 7b merged
-(PRs #16, #17). v0.1.0 released 2026-11-24. Later phases (8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md`.
-Tickets: 55 indicator library, 56 feature pipeline without look-ahead, 57 signals tables (append-only audit),
-58 rule engine, 59 scheduled signal run on candle close, 60 `GET /signals`, 61 web signals page.
+**Phase 8b — Risk engine** on `phase-8b-risk` (AITP-62 … 67). Phases 7, 7b, 8a merged (PRs #16, #17, #18).
+v0.1.0 released 2026-11-24. Later phases (9, 9b, 10 to 12) are planned in `docs/PLAN.md`.
+Tickets: 62 ATR stop/target/R:R, 63 fixed-fractional sizing with caps, 64 risk limits config, 65 veto layer,
+66 kill switch (audited), 67 API + web show the risk plan.
 
 ## Last completed
 
@@ -61,13 +61,9 @@ Tickets: 55 indicator library, 56 feature pipeline without look-ahead, 57 signal
 
 - Phase 7 (crypto and gold market data): AITP-41 candle tables (hypertable, NUMERIC, UTC), AITP-42 Binance adapter via ccxt, AITP-43 gold: PAXG/USDT default plus optional Twelve Data XAU/USD, AITP-44 backfill job, AITP-45 hourly update + market-hours-aware gap refill, AITP-46 data-quality checks + `/data/quality` + status page card, AITP-47 `/data/instruments` and `/data/candles`, AITP-48 web `/charts`. Verified live with real Binance data (BTC, ETH, PAXG all healthy). Review fixes: Twelve Data "no data" handling, throttling, NY-time market hours, key never in errors.
 
-## In progress
+## In progress\n\nPhase 8b, ticket by ticket. Local servers (API :8000, stream, worker, beat, ngrok tunnel) run from `develop` after the 8a merge; restart the API, worker and beat to pick up each phase's code.\n\n## Next up
 
-Phase 8a, ticket by ticket. Local dev servers (API :8000, stream, worker, beat, ngrok tunnel) were restarted from `develop` on 2026-11-24 so the public URL serves the current web app; logs are in `/tmp/aitp-run/`.
-
-## Next up
-
-1. Phase 8a in progress; the owner reviews and merges its PR when opened.
+1. Phase 8b in progress; the owner reviews and merges its PR when opened.
 2. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 3. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 4. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
