@@ -9,6 +9,23 @@ describe("apiTarget", () => {
     expect(apiTarget("/api/version", API)?.origin).toBe(API);
   });
 
+  it("allows the live stream with a valid symbol and forwards nothing else", () => {
+    const target = apiTarget("/api/data/stream", API, "?symbol=BTC/USDT&x=1&token=abc");
+    expect(target?.href).toBe("http://127.0.0.1:8000/data/stream?symbol=BTC%2FUSDT");
+  });
+
+  it.each(["", "?symbol=", "?symbol=btc", "?symbol=../x", "?symbol=BTC/USDT/EXTRA", "?x=1"])(
+    "refuses the live stream with search %j",
+    (search) => {
+      expect(apiTarget("/api/data/stream", API, search)).toBeNull();
+    },
+  );
+
+  it("still blocks the other data endpoints", () => {
+    expect(apiTarget("/api/data/candles", API, "?instrument_id=1&timeframe=1h")).toBeNull();
+    expect(apiTarget("/api/data/quality", API)).toBeNull();
+  });
+
   it.each([
     "/api//evil.com/x",
     "/api/\\evil.com",

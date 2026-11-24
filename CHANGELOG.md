@@ -13,6 +13,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Stream gap healing: the stream service refetches the last day of 1m candles over REST at startup, after every reconnect and every 5 minutes, logs and refills any holes (including candles cut short by a disconnect) (AITP-51).
 - Migration `0003`: TimescaleDB continuous aggregates `candles_5m_agg` and `candles_1h_agg` built from 1m candles (real-time, with a per-bucket candle count so partial buckets are visible), compression of chunks older than 7 days, and a daily job deleting 1m candles older than `CANDLE_1M_RETENTION_DAYS` (default 90, 0 keeps all; the aggregates, 1h and 1d candles are kept). `GET /data/candles?timeframe=5m` serves complete 5-minute buckets from the aggregate (AITP-52).
 - `GET /data/stream?symbol=BTC/USDT`: live forming-candle updates as Server-Sent Events relayed from Redis. Slow clients get only the newest update, quiet streams send keepalives, at most 50 streams at once, unknown symbols are rejected, and slots and Redis subscriptions are released when a client leaves (AITP-53).
+- Web `/charts` shows a live price and a Live / Reconnecting badge for Binance instruments, and the current candle moves in real time without redrawing the chart. The proxy forwards `/api/data/stream` only, with a validated `symbol` and nothing else. The stream response is marked `no-transform` because the web server's compression otherwise held events back for browsers (AITP-54).
 
 ### Added
 

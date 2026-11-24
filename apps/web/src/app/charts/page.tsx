@@ -1,5 +1,5 @@
 import { ChartControls, type ChartTimeframe, TIMEFRAMES } from "@/components/chart-controls";
-import { PriceChart } from "@/components/price-chart";
+import { LiveChart } from "@/components/live-chart";
 import { Card } from "@/components/ui/card";
 import { getCandles, getInstruments } from "@/lib/api";
 import { toChartData } from "@/lib/chart-data";
@@ -65,7 +65,12 @@ export default async function Charts({
         </Notice>
       ) : (
         <Card className="p-2 sm:p-4">
-          <PriceChart data={data} />
+          <LiveChart
+            data={data}
+            timeframe={timeframe}
+            symbol={selected.symbol}
+            streamed={selected.venue === "binance"}
+          />
         </Card>
       )}
     </div>

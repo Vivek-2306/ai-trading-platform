@@ -1,16 +1,28 @@
 "use client";
 
+import type { ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import { CandlestickSeries, ColorType, createChart } from "lightweight-charts";
 import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import type { ChartCandle } from "@/lib/chart-data";
+import { applyLive, type LiveCandle } from "@/lib/live";
 
 const UP = "#22c55e";
 const DOWN = "#ef4444";
 
 /** A candlestick chart that fills its container and follows the light/dark theme. */
-export function PriceChart({ data }: { data: ChartCandle[] }) {
+export function PriceChart({
+  data,
+  live = null,
+  timeframeSeconds = 3600,
+}: {
+  data: ChartCandle[];
+  live?: LiveCandle | null;
+  timeframeSeconds?: number;
+}) {
   const container = useRef<HTMLDivElement>(null);
+  const series = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const current = useRef<ChartCandle | undefined>(undefined);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
@@ -30,17 +42,31 @@ export function PriceChart({ data }: { data: ChartCandle[] }) {
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true },
     });
-    const series = chart.addSeries(CandlestickSeries, {
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: UP,
       downColor: DOWN,
       wickUpColor: UP,
       wickDownColor: DOWN,
       borderVisible: false,
     });
-    series.setData(data.map((c) => ({ ...c, time: c.time as never })));
+    candles.setData(data.map((c) => ({ ...c, time: c.time as UTCTimestamp })));
+    series.current = candles;
+    current.current = data[data.length - 1];
     chart.timeScale().fitContent();
-    return () => chart.remove();
+    return () => {
+      series.current = null;
+      chart.remove();
+    };
   }, [data, resolvedTheme]);
+
+  // A live update moves the newest candle (or starts the next one) without redrawing the chart.
+  useEffect(() => {
+    if (!live || !series.current) return;
+    const next = applyLive(current.current, live, timeframeSeconds);
+    if (!next) return;
+    current.current = next;
+    series.current.update({ ...next, time: next.time as UTCTimestamp });
+  }, [live, timeframeSeconds]);
 
   const first = data[0];
   const last = data[data.length - 1];
