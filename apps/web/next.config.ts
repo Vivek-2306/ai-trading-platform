@@ -5,17 +5,11 @@ import type { NextConfig } from "next";
 // One env file for the whole repo: read it from the monorepo root, not from apps/web.
 loadEnvConfig(resolve(import.meta.dirname, "../.."));
 
-// The browser only talks to this web server; it forwards /api/* to the backend.
-// That keeps one public URL (needed for the phone tunnel) and avoids CORS.
-const apiUrl = process.env.API_URL ?? "http://127.0.0.1:8000";
-
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@aitp/api-client"],
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${apiUrl}/:path*` }];
-  },
+  serverExternalPackages: ["pino", "pino-pretty"],
 };
 
 export default config;
