@@ -48,6 +48,8 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 - AITP-17 integration tests (5) with testcontainers, in CI; dev DB image switched to pinned `timescale/timescaledb:2.32.1-pg17`.
 - Self-review fixes (`%` in DB passwords, startup cleanup, Celery visibility timeout and no redelivery loops, heartbeat results off, `pnpm beat` on fresh clones); 53 unit + 5 integration tests.
 
+- Phase 3 merged (PR #3, `892f48f`). Phase 4 started: AITP-18 Next.js 16 app in `apps/web` (strict TS, `/api/*` proxied to the API, repo-root env file loaded).
+
 ## In progress
 
 Phase 3 PR #3 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/3
