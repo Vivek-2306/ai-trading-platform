@@ -73,7 +73,7 @@ Python backend included (`apps/api/package.json` wraps the uv commands).
 
 | Task | Everything (root) | Python only (in `apps/api`) |
 | --- | --- | --- |
-| Install | `pnpm install` + `uv sync` (in `apps/api`) | `uv sync` |
+| Install | `pnpm install` + `uv sync --all-groups` (in `apps/api`) | `uv sync --all-groups` (all packages; plain `uv sync` = dev tools only). macOS also needs `brew install libomp` for LightGBM |
 | Lint | `pnpm lint` | `uv run ruff check . && uv run ruff format --check .` |
 | Format | `pnpm format` | `uv run ruff format . && uv run ruff check --fix .` |
 | Typecheck | `pnpm typecheck` | `uv run mypy` (strict) |

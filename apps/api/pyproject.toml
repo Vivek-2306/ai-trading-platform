@@ -58,6 +58,7 @@ markets = [
     "fredapi>=0.5.2",
     "kiteconnect>=5.2.2",
     "polygon-api-client>=0.2.11",
+    "pysocks>=1.7.1",
     "python-telegram-bot>=22.8",
     "tenacity>=9.2.1",
     "trafilatura>=2.1.0",
@@ -94,7 +95,11 @@ files = ["app", "tests"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # exchange-calendars 4.x still uses a pandas API that pandas 3.1 deprecates (library issue).
+    "ignore:Series.values returning an ndarray:pandas.errors.Pandas4Warning",
+]
 addopts = "--strict-markers -m \"not integration\" --cov=app --cov-report=term-missing"
 markers = [
     "integration: needs real Postgres/Redis (Docker); skipped unless selected",

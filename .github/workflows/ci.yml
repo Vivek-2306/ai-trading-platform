@@ -111,3 +111,29 @@ jobs:
         run: |
           (cd apps/api && uv sync --locked)
           pnpm --filter @aitp/api-client check:fresh
+
+  packages:
+    name: Packages (import smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: Install every dependency group
+        run: uv sync --locked --all-groups
+
+      # A missing or broken package fails here instead of being skipped.
+      - name: Import smoke tests
+        run: uv run pytest tests/test_packages.py --no-cov
+        env:
+          REQUIRE_ALL_PACKAGES: "1"
