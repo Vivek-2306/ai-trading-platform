@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ActionBadge, formatCandleTime, SignalCard } from "@/components/signal-card";
+import { ActionBadge, formatCandleTime, money, SignalCard } from "@/components/signal-card";
 import { getLatestSignals, getRecentSignals, type Signal } from "@/lib/api";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-request-id": "req-1" }) }));
@@ -122,5 +122,107 @@ describe("signal fetchers", () => {
     });
     expect(await getLatestSignals()).toBeNull();
     expect(await getRecentSignals()).toBeNull();
+  });
+});
+
+describe("risk display", () => {
+  const plan = {
+    entry: "60000.5",
+    stop: "58500",
+    target: "63000",
+    risk_per_unit: "1500.5",
+    reward_per_unit: "2999.5",
+    risk_reward: "2.00",
+  };
+  const size = {
+    quantity: "0.00333",
+    notional: "199.8",
+    risk_amount: "5",
+    capital_share_pct: "19.98",
+    limited_by: "risk",
+  };
+  const risk = (over = {}) => ({
+    assessed: true,
+    rules_action: "BUY" as const,
+    kill_switch: false,
+    vetoes: [],
+    plan,
+    size,
+    ...over,
+  });
+
+  it("shows entry, stop, target, size, risk and risk-to-reward for an actionable BUY", () => {
+    render(<SignalCard signal={signal({ risk: risk(), actionable: true })} />);
+    const box = screen.getByLabelText("Risk plan");
+    expect(box).toHaveTextContent("Entry");
+    expect(box).toHaveTextContent("60,000.5");
+    expect(box).toHaveTextContent("Stop-loss");
+    expect(box).toHaveTextContent("58,500");
+    expect(box).toHaveTextContent("Target");
+    expect(box).toHaveTextContent("Size");
+    expect(box).toHaveTextContent("0.00333");
+    expect(box).toHaveTextContent("Risking");
+    expect(box).toHaveTextContent("1 : 2.00");
+  });
+
+  it("explains a vetoed BUY instead of showing a plan", () => {
+    render(
+      <SignalCard
+        signal={signal({
+          action: "NO_TRADE",
+          risk: risk({
+            plan: null,
+            size: null,
+            vetoes: [{ code: "max_open_positions", text: "3 positions are open; the limit is 3." }],
+          }),
+        })}
+      />,
+    );
+    expect(screen.queryByLabelText("Risk plan")).not.toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent(
+      "The rules said BUY; the risk engine vetoed it:",
+    );
+    expect(screen.getByRole("note")).toHaveTextContent("3 positions are open");
+  });
+
+  it("says when the kill switch caused it", () => {
+    render(
+      <SignalCard
+        signal={signal({
+          action: "NO_TRADE",
+          risk: risk({
+            plan: null,
+            size: null,
+            kill_switch: true,
+            vetoes: [{ code: "kill_switch", text: "The kill switch is on." }],
+          }),
+        })}
+      />,
+    );
+    expect(screen.getByRole("note")).toHaveTextContent("Kill switch is on: nothing is actionable.");
+  });
+
+  it("flags an older signal as not risk-assessed and hides any plan", () => {
+    render(
+      <SignalCard signal={signal({ risk: risk({ assessed: false, plan: null, size: null }) })} />,
+    );
+    expect(screen.getByRole("note")).toHaveTextContent("Not risk-assessed");
+    expect(screen.queryByLabelText("Risk plan")).not.toBeInTheDocument();
+  });
+
+  it("never shows a plan on a stale signal", () => {
+    render(<SignalCard signal={signal({ stale: true, risk: risk() })} />);
+    expect(screen.queryByLabelText("Risk plan")).not.toBeInTheDocument();
+  });
+});
+
+describe("money", () => {
+  it("formats exact decimal strings without going through a float", () => {
+    expect(money("97000.123456785")).toBe("97,000.123456785"); // a float would round this
+    expect(money("60000.50000000")).toBe("60,000.5");
+    expect(money("1234567")).toBe("1,234,567");
+    expect(money("0.00005")).toBe("0.00005");
+    expect(money("-1500.5")).toBe("-1,500.5");
+    expect(money("100.00000000")).toBe("100");
   });
 });

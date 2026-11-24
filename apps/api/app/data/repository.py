@@ -87,6 +87,12 @@ async def latest_candle_time(
 async def record_signal(session: AsyncSession, signal: Signal) -> bool:
     """Append a signal. Returns False if one already exists for that instrument, timeframe,
     candle and rule version (so running a signal job twice stores it once)."""
+    # Defence in depth next to the database rule: nothing is stored unless the risk veto ran.
+    risk = signal.risk or {}
+    if risk.get("assessed") is not True:
+        raise ValueError("a signal can only be stored with the risk engine's assessment")
+    if signal.action == "BUY" and not ("plan" in risk and "size" in risk):
+        raise ValueError("a BUY signal must carry its trade plan and size")
     statement = (
         insert(Signal)
         .values(
@@ -98,6 +104,7 @@ async def record_signal(session: AsyncSession, signal: Signal) -> bool:
             reasons=signal.reasons,
             inputs=signal.inputs,
             rule_version=signal.rule_version,
+            risk=risk,
         )
         .on_conflict_do_nothing(constraint="uq_signals_candle")
     )

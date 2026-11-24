@@ -8,6 +8,7 @@ that sizes or places an order should read them without converting through the ri
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 import numpy as np
 import talib
@@ -28,6 +29,8 @@ class CandleSeries:
     low: Array
     close: Array
     volume: Array
+    # The newest close as the exact stored decimal (the arrays above are floats, for analysis).
+    last_close: Decimal | None = None
 
     def __len__(self) -> int:
         return len(self.times)
@@ -42,6 +45,7 @@ class CandleSeries:
             low=np.array([float(c.low) for c in ordered], dtype=np.float64),
             close=np.array([float(c.close) for c in ordered], dtype=np.float64),
             volume=np.array([float(c.volume) for c in ordered], dtype=np.float64),
+            last_close=ordered[-1].close if ordered else None,
         )
 
     def upto(self, end: int) -> "CandleSeries":
@@ -53,6 +57,7 @@ class CandleSeries:
             self.low[:end],
             self.close[:end],
             self.volume[:end],
+            self.last_close if end >= len(self) else Decimal(str(self.close[end - 1])),
         )
 
 

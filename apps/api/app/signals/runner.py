@@ -20,6 +20,9 @@ from app.data.gaps import find_gaps
 from app.data.models import Candle, Instrument, Signal, SignalAction, Timeframe
 from app.data.repository import record_signal
 from app.data.universe import InstrumentSpec
+from app.risk.killswitch import kill_switch_state
+from app.risk.limits import get_risk_limits
+from app.risk.veto import RiskAssessment, assess, current_portfolio_state
 from app.signals.rules import Decision, RuleConfig, evaluate, no_trade
 
 logger = get_logger(__name__)
@@ -56,16 +59,44 @@ async def load_series(
     return CandleSeries.from_candles(candles)
 
 
-def to_signal(instrument_id: int, timeframe: Timeframe, candle_ts: datetime, d: Decision) -> Signal:
+def to_signal(
+    instrument_id: int,
+    timeframe: Timeframe,
+    candle_ts: datetime,
+    d: Decision,
+    assessment: RiskAssessment,
+) -> Signal:
+    """The only place a Signal is built. It needs the risk assessment, so a rule decision can
+    never be stored without having been through the veto layer."""
+    reasons = [r.as_dict() for r in d.reasons]
+    reasons += [
+        {"code": f"risk_{v.code}", "text": v.text, "direction": "info", "weight": 0.0}
+        for v in assessment.vetoes
+    ]
+    if assessment.action is SignalAction.BUY and assessment.plan and assessment.size:
+        reasons.append(
+            {
+                "code": "risk_plan",
+                "text": (
+                    f"Plan: buy near {assessment.plan.entry:f}, stop {assessment.plan.stop:f}, "
+                    f"target {assessment.plan.target:f}, size {assessment.size.quantity:f} "
+                    f"(risking {assessment.size.risk_amount:f}, risk-to-reward "
+                    f"{assessment.plan.risk_reward:f})."
+                ),
+                "direction": "info",
+                "weight": 0.0,
+            }
+        )
     return Signal(
         instrument_id=instrument_id,
         timeframe=timeframe.value,
         candle_ts=candle_ts,
-        action=d.action.value,
+        action=assessment.action.value,  # after the veto, not what the rules first said
         confidence=d.confidence,
-        reasons=[r.as_dict() for r in d.reasons],
+        reasons=reasons,
         inputs={k: v for k, v in d.inputs.items()},
         rule_version=d.rule_version,
+        risk=assessment.as_record(),
     )
 
 
@@ -132,14 +163,28 @@ async def run_signal(
             )
         else:
             decision = evaluate(features, config)
-        stored = await record_signal(session, to_signal(instrument.id, timeframe, newest, decision))
+        # Every decision, including data gaps, goes through the risk veto before it is stored.
+        assessment = assess(
+            decision,
+            symbol=spec.symbol,
+            entry=series.last_close,
+            atr=decision.inputs.get("atr"),
+            limits=get_risk_limits(),
+            state=current_portfolio_state(),
+            kill_switch_on=(await kill_switch_state(session)).active,
+        )
+        stored = await record_signal(
+            session, to_signal(instrument.id, timeframe, newest, decision, assessment)
+        )
     logger.info(
         "signal",
         symbol=spec.symbol,
         timeframe=timeframe.value,
         candle=newest.isoformat(),
-        action=decision.action.value,
+        rules_action=decision.action.value,
+        action=assessment.action.value,
+        vetoes=[v.code for v in assessment.vetoes],
         confidence=str(Decimal(decision.confidence)),
         stored=stored,
     )
-    return RunResult(spec.symbol, timeframe.value, newest, decision.action, stored)
+    return RunResult(spec.symbol, timeframe.value, newest, assessment.action, stored)

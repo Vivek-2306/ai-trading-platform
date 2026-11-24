@@ -210,6 +210,199 @@
         "title": "InstrumentQuality",
         "type": "object"
       },
+      "KillSwitchEventOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "active",
+          "actor",
+          "reason",
+          "created_at"
+        ],
+        "title": "KillSwitchEventOut",
+        "type": "object"
+      },
+      "KillSwitchOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "title": "KillSwitchOut",
+        "type": "object"
+      },
+      "KillSwitchRequest": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "reason"
+        ],
+        "title": "KillSwitchRequest",
+        "type": "object"
+      },
+      "LimitsOut": {
+        "properties": {
+          "capital": {
+            "title": "Capital",
+            "type": "string"
+          },
+          "max_capital_share_pct": {
+            "title": "Max Capital Share Pct",
+            "type": "string"
+          },
+          "max_daily_loss_pct": {
+            "title": "Max Daily Loss Pct",
+            "type": "string"
+          },
+          "max_open_positions": {
+            "title": "Max Open Positions",
+            "type": "integer"
+          },
+          "max_stop_distance_pct": {
+            "title": "Max Stop Distance Pct",
+            "type": "string"
+          },
+          "min_risk_reward": {
+            "title": "Min Risk Reward",
+            "type": "string"
+          },
+          "risk_per_trade_pct": {
+            "title": "Risk Per Trade Pct",
+            "type": "string"
+          },
+          "stop_atr_multiple": {
+            "title": "Stop Atr Multiple",
+            "type": "string"
+          },
+          "target_atr_multiple": {
+            "title": "Target Atr Multiple",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capital",
+          "risk_per_trade_pct",
+          "max_capital_share_pct",
+          "max_daily_loss_pct",
+          "max_open_positions",
+          "min_risk_reward",
+          "stop_atr_multiple",
+          "target_atr_multiple",
+          "max_stop_distance_pct"
+        ],
+        "title": "LimitsOut",
+        "type": "object"
+      },
+      "PlanOut": {
+        "description": "Prices as exact decimal strings.",
+        "properties": {
+          "entry": {
+            "title": "Entry",
+            "type": "string"
+          },
+          "reward_per_unit": {
+            "title": "Reward Per Unit",
+            "type": "string"
+          },
+          "risk_per_unit": {
+            "title": "Risk Per Unit",
+            "type": "string"
+          },
+          "risk_reward": {
+            "title": "Risk Reward",
+            "type": "string"
+          },
+          "stop": {
+            "title": "Stop",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry",
+          "stop",
+          "target",
+          "risk_per_unit",
+          "reward_per_unit",
+          "risk_reward"
+        ],
+        "title": "PlanOut",
+        "type": "object"
+      },
       "QualityResponse": {
         "properties": {
           "instruments": {
@@ -288,6 +481,90 @@
         "title": "ReasonOut",
         "type": "object"
       },
+      "RiskOut": {
+        "description": "The risk engine's verdict on a signal.",
+        "properties": {
+          "assessed": {
+            "default": false,
+            "title": "Assessed",
+            "type": "boolean"
+          },
+          "kill_switch": {
+            "default": false,
+            "title": "Kill Switch",
+            "type": "boolean"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portfolio_tracked": {
+            "default": false,
+            "title": "Portfolio Tracked",
+            "type": "boolean"
+          },
+          "rules_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignalAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vetoes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VetoOut"
+            },
+            "title": "Vetoes",
+            "type": "array"
+          }
+        },
+        "title": "RiskOut",
+        "type": "object"
+      },
+      "RiskStatus": {
+        "properties": {
+          "kill_switch": {
+            "$ref": "#/components/schemas/KillSwitchOut"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitsOut"
+          },
+          "recent_events": {
+            "items": {
+              "$ref": "#/components/schemas/KillSwitchEventOut"
+            },
+            "title": "Recent Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kill_switch",
+          "limits",
+          "recent_events"
+        ],
+        "title": "RiskStatus",
+        "type": "object"
+      },
       "SignalAction": {
         "enum": [
           "BUY",
@@ -302,6 +579,11 @@
         "properties": {
           "action": {
             "$ref": "#/components/schemas/SignalAction"
+          },
+          "actionable": {
+            "default": false,
+            "title": "Actionable",
+            "type": "boolean"
           },
           "candle_ts": {
             "format": "date-time",
@@ -336,6 +618,15 @@
             },
             "title": "Reasons",
             "type": "array"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskOut",
+            "default": {
+              "assessed": false,
+              "kill_switch": false,
+              "portfolio_tracked": false,
+              "vetoes": []
+            }
           },
           "rule_version": {
             "title": "Rule Version",
@@ -402,6 +693,39 @@
           "next_before_id"
         ],
         "title": "SignalsResponse",
+        "type": "object"
+      },
+      "SizeOut": {
+        "properties": {
+          "capital_share_pct": {
+            "title": "Capital Share Pct",
+            "type": "string"
+          },
+          "limited_by": {
+            "title": "Limited By",
+            "type": "string"
+          },
+          "notional": {
+            "title": "Notional",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "risk_amount": {
+            "title": "Risk Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity",
+          "notional",
+          "risk_amount",
+          "capital_share_pct",
+          "limited_by"
+        ],
+        "title": "SizeOut",
         "type": "object"
       },
       "Timeframe": {
@@ -488,6 +812,24 @@
           "environment"
         ],
         "title": "VersionResponse",
+        "type": "object"
+      },
+      "VetoOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ],
+        "title": "VetoOut",
         "type": "object"
       }
     }
@@ -730,6 +1072,91 @@
         "summary": "Readiness check",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/risk/kill-switch": {
+      "post": {
+        "description": "ON needs nothing. OFF needs the admin token.",
+        "operationId": "change_kill_switch_risk_kill_switch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-admin-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KillSwitchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KillSwitchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Switching off needs the admin token (or use the command line)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Switch the kill switch on or off",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/risk/status": {
+      "get": {
+        "description": "The kill switch state with its recent changes, and the active risk limits.",
+        "operationId": "status_risk_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Risk limits and kill switch state",
+        "tags": [
+          "risk"
         ]
       }
     },

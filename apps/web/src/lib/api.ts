@@ -142,6 +142,33 @@ export type SignalReason = {
 
 export type SignalAction = "BUY" | "SELL" | "HOLD" | "NO_TRADE";
 
+export type SignalRisk = {
+  /** False for signals from before the risk engine: not risk-assessed, do not act on them. */
+  assessed: boolean;
+  /** False until paper trading exists: open-position and daily-loss limits are not enforced yet. */
+  portfolio_tracked?: boolean;
+  /** What the rules said before the risk veto (a refused BUY reads BUY here). */
+  rules_action: SignalAction | null;
+  kill_switch: boolean;
+  vetoes: { code: string; text: string }[];
+  /** Exact decimal strings. Only present for a BUY that passed the veto. */
+  plan: {
+    entry: string;
+    stop: string;
+    target: string;
+    risk_per_unit: string;
+    reward_per_unit: string;
+    risk_reward: string;
+  } | null;
+  size: {
+    quantity: string;
+    notional: string;
+    risk_amount: string;
+    capital_share_pct: string;
+    limited_by: string;
+  } | null;
+};
+
 export type Signal = {
   id: number;
   instrument_id: number;
@@ -158,6 +185,9 @@ export type Signal = {
   created_at: string;
   /** The candle is old (the feed or the job stopped): do not act on this signal. */
   stale?: boolean;
+  risk?: SignalRisk;
+  /** BUY or SELL that passed the risk veto and is not stale. */
+  actionable?: boolean;
 };
 
 /** The newest signal per instrument and timeframe, or null if the API cannot answer. */
@@ -189,6 +219,40 @@ export async function getRecentSignals(limit = 20): Promise<Signal[] | null> {
     return (data?.signals as Signal[] | undefined) ?? null;
   } catch (error) {
     logger.warn({ request_id: requestId, err: String(error) }, "signals_unavailable");
+    return null;
+  }
+}
+
+export type RiskStatus = {
+  kill_switch: {
+    active: boolean;
+    since: string | null;
+    actor: string | null;
+    reason: string | null;
+  };
+  limits: {
+    capital: string;
+    risk_per_trade_pct: string;
+    max_capital_share_pct: string;
+    max_daily_loss_pct: string;
+    max_open_positions: number;
+    min_risk_reward: string;
+  };
+};
+
+/** Kill switch state and the active limits, or null if the API cannot answer. Read on the
+ * server only: the web proxy does not forward /risk to browsers. */
+export async function getRiskStatus(): Promise<RiskStatus | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/risk/status", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(6000),
+    });
+    return (data as RiskStatus | undefined) ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "risk_status_unavailable");
     return null;
   }
 }

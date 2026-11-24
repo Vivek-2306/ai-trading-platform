@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -20,6 +21,28 @@ pytestmark = pytest.mark.integration
 
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
+
+
+def _risk(action: str) -> dict[str, object]:
+    """A risk record as the veto layer writes it (a BUY must carry its plan and size)."""
+    record: dict[str, object] = {"assessed": True, "vetoes": []}
+    if action == "BUY":
+        record["plan"] = {
+            "entry": "100",
+            "stop": "97",
+            "target": "106",
+            "risk_per_unit": "3",
+            "reward_per_unit": "6",
+            "risk_reward": "2.00",
+        }
+        record["size"] = {
+            "quantity": "1",
+            "notional": "100",
+            "risk_amount": "3",
+            "capital_share_pct": "10",
+            "limited_by": "risk",
+        }
+    return record
 
 
 def _migrate(url: str) -> None:
@@ -854,6 +877,7 @@ def test_signals_are_append_only(postgres_url: str) -> None:
             reasons=[{"code": "rsi_oversold", "text": "RSI is 25", "direction": "buy"}],
             inputs={"rsi": 25.0},
             rule_version="rules-v1",
+            risk=_risk(action),
         )
 
     async def work(session: AsyncSession) -> dict[str, object]:
@@ -912,6 +936,7 @@ def test_signals_are_append_only(postgres_url: str) -> None:
             "reasons": s.reasons,
             "inputs": s.inputs,
             "rule_version": s.rule_version,
+            "risk": s.risk,
         }
 
     out = _run(postgres_url, work)
@@ -1013,7 +1038,7 @@ def test_signal_run_stores_one_signal_per_candle(
     assert out["unknown"] is None
     row = out["row"]
     assert row.n == 1 and row.ts == last_candle  # type: ignore[attr-defined]
-    assert row.version == "rules-v1" and row.explained and row.has_inputs  # type: ignore[attr-defined]
+    assert row.version == "rules-v2" and row.explained and row.has_inputs  # type: ignore[attr-defined]
 
 
 def test_signal_task_survives_a_failing_instrument(
@@ -1060,6 +1085,7 @@ def test_signals_endpoints_filter_page_and_show_latest(postgres_url: str, redis_
             reasons=[{"code": "trend_up", "text": "Uptrend.", "direction": "buy", "weight": 2.0}],
             inputs={"rsi": 55.0},
             rule_version="rules-v1",
+            risk=_risk(action),
         )
 
     async def seed(session: AsyncSession) -> tuple[int, int]:
@@ -1191,3 +1217,364 @@ def test_signal_run_skips_a_late_candle_and_flags_a_data_gap(postgres_url: str) 
     row = out["row"]
     assert row.action == "NO_TRADE"  # type: ignore[attr-defined]
     assert row.reasons[0]["code"] == "data_gap" and "3 candle" in row.reasons[0]["text"]  # type: ignore[attr-defined]
+
+
+def test_kill_switch_state_audit_and_append_only(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import argparse
+
+    from sqlalchemy.exc import DBAPIError
+
+    from app.core.config import Settings
+    from app.risk import killswitch
+    from app.risk.killswitch import kill_switch_state, recent_events, set_kill_switch
+
+    _migrate(postgres_url)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        out: dict[str, object] = {}
+        await session.execute(text("ALTER TABLE kill_switch_events DISABLE TRIGGER USER"))
+        await session.execute(text("DELETE FROM kill_switch_events"))  # clean slate for the test
+        await session.execute(text("ALTER TABLE kill_switch_events ENABLE TRIGGER USER"))
+        await session.commit()
+        out["initial"] = (await kill_switch_state(session)).active
+        s1, changed1 = await set_kill_switch(session, active=True, actor="api", reason="outage")
+        s2, changed2 = await set_kill_switch(session, active=True, actor="api", reason="again")
+        s3, changed3 = await set_kill_switch(
+            session, active=False, actor="cli:me", reason="all clear"
+        )
+        out["flow"] = (s1.active, changed1, s2.active, changed2, s3.active, changed3)
+        out["audit"] = [
+            (e.active, e.actor, e.reason) for e in reversed(await recent_events(session))
+        ]
+        try:
+            await set_kill_switch(session, active=True, actor="api", reason=" ")
+            out["blank_reason"] = "accepted"
+        except ValueError:
+            out["blank_reason"] = "rejected"
+        for name, statement in (
+            ("update", "UPDATE kill_switch_events SET active = false"),
+            ("delete", "DELETE FROM kill_switch_events"),
+            ("truncate", "TRUNCATE kill_switch_events"),
+        ):
+            try:
+                await session.execute(text(statement))
+                await session.commit()
+                out[name] = "allowed"
+            except DBAPIError as exc:
+                await session.rollback()
+                out[name] = "append-only" if "append-only" in str(exc) else str(exc)
+        return out
+
+    out = _run(postgres_url, work)
+    assert out["initial"] is False  # off when nothing was ever recorded
+    assert out["flow"] == (True, True, True, False, False, True)  # the repeat changed nothing
+    assert out["audit"] == [(True, "api", "outage"), (False, "cli:me", "all clear")]
+    assert out["blank_reason"] == "rejected"
+    assert out["update"] == out["delete"] == out["truncate"] == "append-only"
+
+    # The command line writes to the same log.
+    monkeypatch.setattr(
+        "app.risk.killswitch.get_settings",
+        lambda: Settings(_env_file=None, database_url=postgres_url),
+    )
+    assert (
+        asyncio.run(killswitch._cli(argparse.Namespace(command="on", reason="from the cli"))) == 0
+    )
+
+    async def after(session: AsyncSession) -> tuple[bool, str | None]:
+        state = await kill_switch_state(session)
+        return state.active, state.reason
+
+    assert _run(postgres_url, after) == (True, "from the cli")
+
+
+def test_kill_switch_api_on_is_open_off_needs_the_token(
+    postgres_url: str, redis_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.main import create_app
+    from app.risk.limits import get_risk_limits
+
+    _migrate(postgres_url)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+
+    def post(client: TestClient, active: bool, token: str | None = None) -> int:
+        headers = {"X-Admin-Token": token} if token else {}
+        body = {"active": active, "reason": "testing the switch"}
+        return client.post("/risk/kill-switch", json=body, headers=headers).status_code
+
+    monkeypatch.delenv("RISK_ADMIN_TOKEN", raising=False)
+    get_risk_limits.cache_clear()
+    with TestClient(create_app(settings)) as client:
+        assert post(client, True) == 200  # switching ON needs nothing
+        assert client.get("/risk/status").json()["kill_switch"]["active"] is True
+        # No token configured: OFF only from the command line. Same answer as a wrong token.
+        assert post(client, False) == 401
+        assert post(client, False, "guess") == 401
+
+    monkeypatch.setenv("RISK_ADMIN_TOKEN", "open-sesame-0123456789")
+    get_risk_limits.cache_clear()
+    try:
+        with TestClient(create_app(settings)) as client:
+            assert post(client, False) == 401  # token configured, none sent
+            assert post(client, False, "wrong") == 401
+            assert client.get("/risk/status").json()["kill_switch"]["active"] is True
+            assert post(client, False, "open-sesame-0123456789") == 200
+            status = client.get("/risk/status").json()
+            assert status["kill_switch"]["active"] is False
+            assert status["limits"]["risk_per_trade_pct"] == "0.5"
+            assert "admin_token" not in str(status) and "open-sesame-0123456789" not in str(status)
+            assert [e["active"] for e in status["recent_events"][:2]] == [False, True]
+    finally:
+        monkeypatch.delenv("RISK_ADMIN_TOKEN")
+        get_risk_limits.cache_clear()
+
+
+def test_the_runner_stores_the_post_veto_action_and_the_database_refuses_a_bare_buy(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import numpy as np
+    from sqlalchemy import insert as core_insert
+    from sqlalchemy.exc import IntegrityError
+
+    from app.data.models import AssetClass, SignalAction, Timeframe
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.risk.killswitch import set_kill_switch
+    from app.signals import runner
+    from app.signals.rules import Decision, Reason
+
+    _migrate(postgres_url)
+    rng = np.random.default_rng(11)
+    start = datetime(2026, 11, 1, tzinfo=UTC)
+    spec = InstrumentSpec("binance", "RISKTEST/USDT", AssetClass.CRYPTO)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (await get_or_create_instrument(session, spec)).id
+        await session.commit()
+        price = 100.0
+        rows = []
+        for i in range(120):
+            price *= 1 + rng.normal(0, 0.01)
+            rows.append(
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=i),
+                    "open": Decimal(str(round(price, 4))),
+                    "high": Decimal(str(round(price * 1.004, 4))),
+                    "low": Decimal(str(round(price * 0.996, 4))),
+                    "close": Decimal(str(round(price, 4))),
+                    "volume": Decimal(5),
+                }
+            )
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return iid
+
+    iid = _run(postgres_url, seed)
+    now = start + timedelta(hours=120, minutes=10)
+
+    def buy_decision(features: object, config: object = None) -> Decision:
+        return Decision(
+            SignalAction.BUY,
+            Decimal("0.8"),
+            [Reason("trend_up", "Uptrend.", "buy", 2.0)],
+            {"atr": 1.2, "close": 100.0, "rsi": 55.0},
+        )
+
+    monkeypatch.setattr(runner, "evaluate", buy_decision)
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        out: dict[str, object] = {}
+        await runner.run_signal(sessions, spec, Timeframe.H1, now=now)
+        row = (
+            await session.execute(
+                text("SELECT action, risk, reasons FROM signals WHERE instrument_id = :i"),
+                {"i": iid},
+            )
+        ).one()
+        out["buy"] = (row.action, row.risk, [r["code"] for r in row.reasons])
+
+        # Kill switch on: the next candle's signal must come out as NO_TRADE.
+        await set_kill_switch(session, active=True, actor="test", reason="integration test")
+        later = now + timedelta(hours=1)
+        await session.execute(  # one more candle so there is a new signal to make
+            core_insert(Candle),
+            [
+                {
+                    "instrument_id": iid,
+                    "timeframe": "1h",
+                    "ts": start + timedelta(hours=120),
+                    "open": Decimal(100),
+                    "high": Decimal(101),
+                    "low": Decimal(99),
+                    "close": Decimal(100),
+                    "volume": Decimal(5),
+                }
+            ],
+        )
+        await session.commit()
+        await runner.run_signal(sessions, spec, Timeframe.H1, now=later)
+        killed = (
+            await session.execute(
+                text(
+                    "SELECT action, risk, reasons FROM signals WHERE instrument_id = :i "
+                    "ORDER BY candle_ts DESC LIMIT 1"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        out["killed"] = (
+            killed.action,
+            killed.risk["kill_switch"],
+            killed.risk["rules_action"],
+            [r["code"] for r in killed.reasons],
+        )
+        await set_kill_switch(session, active=False, actor="test", reason="integration test done")
+
+        # The database itself refuses a BUY that carries no plan, whoever writes it.
+        try:
+            await session.execute(
+                text(
+                    "INSERT INTO signals (instrument_id, timeframe, candle_ts, action, confidence, "
+                    "reasons, inputs, rule_version, risk) VALUES (:i, '1h', now(), 'BUY', 0.9, "
+                    "'[]'::jsonb, '{}'::jsonb, 'x', '{}'::jsonb)"
+                ),
+                {"i": iid},
+            )
+            await session.commit()
+            out["bare_buy"] = "accepted"
+        except IntegrityError:
+            await session.rollback()
+            out["bare_buy"] = "refused"
+        return out
+
+    out: dict[str, Any] = _run(postgres_url, work)
+    action, risk, codes = out["buy"]
+    assert action == "BUY" and risk["assessed"] is True
+    assert risk["plan"]["entry"] and risk["plan"]["stop"] and risk["size"]["quantity"]
+    assert "risk_plan" in codes  # the human-readable plan is part of the reasons
+    killed_action, kill_flag, rules_action, killed_codes = out["killed"]
+    assert (killed_action, kill_flag, rules_action) == ("NO_TRADE", True, "BUY")
+    assert "risk_kill_switch" in killed_codes
+    assert out["bare_buy"] == "refused"
+
+
+def test_signals_api_reads_the_kill_switch_live_and_a_legacy_buy_does_not_block_the_migration(
+    postgres_url: str, redis_url: str
+) -> None:
+    from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import create_async_engine as make_engine
+
+    from app.core.config import Settings
+    from app.data.models import AssetClass, Signal
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+    from app.risk.killswitch import set_kill_switch
+
+    _migrate(postgres_url)
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "LIVEKS/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        await session.commit()
+        await record_signal(
+            session,
+            Signal(
+                instrument_id=iid,
+                timeframe="1h",
+                candle_ts=now - timedelta(hours=1),
+                action="BUY",
+                confidence=Decimal("0.8"),
+                reasons=[],
+                inputs={},
+                rule_version="rules-v2",
+                risk=_risk("BUY"),
+            ),
+        )
+        await set_kill_switch(session, active=False, actor="test", reason="reset for this test")
+        return iid
+
+    iid = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+
+    def fetch(client: TestClient) -> dict[str, object]:
+        rows = client.get("/signals", params={"instrument_id": iid}).json()["signals"]
+        return rows[0]  # type: ignore[no-any-return]
+
+    with TestClient(create_app(settings)) as client:
+        before = fetch(client)
+
+        async def turn_on(session: AsyncSession) -> None:
+            await set_kill_switch(session, active=True, actor="test", reason="live check")
+
+        _run(postgres_url, turn_on)
+        during = fetch(client)
+
+        async def turn_off(session: AsyncSession) -> None:
+            await set_kill_switch(session, active=False, actor="test", reason="live check done")
+
+        _run(postgres_url, turn_off)
+
+    assert before["actionable"] is True and before["risk"]["plan"]["stop"] == "97"  # type: ignore[index]
+    assert before["risk"]["portfolio_tracked"] is False  # type: ignore[index]
+    # Switched on AFTER the BUY was stored: it must stop being actionable and lose its plan.
+    assert during["actionable"] is False
+    assert during["risk"]["plan"] is None and during["risk"]["size"] is None  # type: ignore[index]
+    assert during["risk"]["kill_switch"] is True  # type: ignore[index]
+
+    # A database that already holds a BUY from before the risk engine can still be migrated.
+    async def legacy() -> str:
+        engine = make_engine(postgres_url, isolation_level="AUTOCOMMIT")
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("DROP DATABASE IF EXISTS legacy_mig"))
+                await conn.execute(text("CREATE DATABASE legacy_mig"))
+        finally:
+            await engine.dispose()
+        return postgres_url.rsplit("/", 1)[0] + "/legacy_mig"
+
+    legacy_url = asyncio.run(legacy())
+    config = Config(str(ALEMBIC_INI))
+    config.attributes["configure_logger"] = False
+    config.set_main_option("sqlalchemy.url", legacy_url)
+    command.upgrade(config, "0005")
+
+    async def old_buy_then_migrate() -> str:
+        engine = make_engine(legacy_url)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "INSERT INTO instruments (venue, symbol, asset_class) "
+                        "VALUES ('binance', 'OLD/USDT', 'crypto')"
+                    )
+                )
+                await conn.execute(
+                    text(
+                        "INSERT INTO signals (instrument_id, timeframe, candle_ts, action, "
+                        "confidence, reasons, inputs, rule_version) SELECT id, '1h', now(), "
+                        "'BUY', 0.9, '[]'::jsonb, '{}'::jsonb, 'rules-v1' FROM instruments"
+                    )
+                )
+        finally:
+            await engine.dispose()
+        return "inserted"
+
+    assert asyncio.run(old_buy_then_migrate()) == "inserted"
+    command.upgrade(config, "head")  # must not fail on the old BUY
