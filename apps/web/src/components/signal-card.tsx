@@ -53,6 +53,66 @@ export function formatCandleTime(iso: string): string {
   return `${time.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
+const money = (value: string) =>
+  Number(value).toLocaleString("en-US", { maximumFractionDigits: 8 });
+
+/** The risk engine's plan for a BUY: where to enter, stop, target, how much, and the risk. */
+export function RiskPlan({ signal }: { signal: Signal }) {
+  const { plan, size } = signal.risk ?? { plan: null, size: null };
+  if (!plan || !size || signal.stale) return null;
+  const rows: [string, string][] = [
+    ["Entry", money(plan.entry)],
+    ["Stop-loss", money(plan.stop)],
+    ["Target", money(plan.target)],
+    ["Size", `${money(size.quantity)} (${money(size.notional)} USDT)`],
+    ["Risking", `${money(size.risk_amount)} USDT`],
+    ["Risk : reward", `1 : ${plan.risk_reward}`],
+  ];
+  return (
+    <section className="mt-4 rounded-xl bg-foreground/5 p-3" aria-label="Risk plan">
+      <p className="text-sm font-medium">Risk plan (checked by the risk engine)</p>
+      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted">{label}</dt>
+            <dd className="text-right tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** Why the risk engine refused a BUY, or that an old signal was never risk-assessed. */
+export function RiskNotes({ signal }: { signal: Signal }) {
+  const risk = signal.risk;
+  if (!risk) return null;
+  if (!risk.assessed) {
+    return (
+      <p role="note" className="mt-3 text-sm text-muted">
+        Not risk-assessed: this signal is from before the risk engine. Do not act on it.
+      </p>
+    );
+  }
+  if (risk.vetoes.length === 0) return null;
+  return (
+    <div role="note" className="mt-3 rounded-xl bg-bad/10 p-3 text-sm">
+      <p className="font-medium text-bad">
+        {risk.kill_switch
+          ? "Kill switch is on: nothing is actionable."
+          : risk.rules_action && risk.rules_action !== "NO_TRADE"
+            ? `The rules said ${risk.rules_action}; the risk engine vetoed it:`
+            : "The risk engine refused:"}
+      </p>
+      <ul className="mt-1 list-disc pl-5">
+        {risk.vetoes.map((veto) => (
+          <li key={veto.code}>{veto.text}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** One signal with its agreement score and the reasons behind it. */
 export function SignalCard({ signal }: { signal: Signal }) {
   const agreement = Math.round(Number(signal.confidence) * 100);
@@ -80,6 +140,9 @@ export function SignalCard({ signal }: { signal: Signal }) {
           or the signal job may have stopped. Do not act on it.
         </p>
       )}
+
+      <RiskPlan signal={signal} />
+      <RiskNotes signal={signal} />
 
       <div className={cn("mt-4", signal.stale && "opacity-50")}>
         <div className="flex justify-between text-sm text-muted">

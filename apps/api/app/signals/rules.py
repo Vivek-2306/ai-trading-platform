@@ -22,7 +22,8 @@ from typing import Any
 from app.analysis.features import SMA_SLOW, FeatureTable, latest
 from app.data.models import SignalAction
 
-RULE_VERSION = "rules-v1"
+# v2: same rules, now every decision goes through the risk veto and stores its assessment.
+RULE_VERSION = "rules-v2"
 
 
 @dataclass(frozen=True, slots=True)

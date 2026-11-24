@@ -364,6 +364,45 @@
         "title": "LimitsOut",
         "type": "object"
       },
+      "PlanOut": {
+        "description": "Prices as exact decimal strings.",
+        "properties": {
+          "entry": {
+            "title": "Entry",
+            "type": "string"
+          },
+          "reward_per_unit": {
+            "title": "Reward Per Unit",
+            "type": "string"
+          },
+          "risk_per_unit": {
+            "title": "Risk Per Unit",
+            "type": "string"
+          },
+          "risk_reward": {
+            "title": "Risk Reward",
+            "type": "string"
+          },
+          "stop": {
+            "title": "Stop",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry",
+          "stop",
+          "target",
+          "risk_per_unit",
+          "reward_per_unit",
+          "risk_reward"
+        ],
+        "title": "PlanOut",
+        "type": "object"
+      },
       "QualityResponse": {
         "properties": {
           "instruments": {
@@ -442,6 +481,61 @@
         "title": "ReasonOut",
         "type": "object"
       },
+      "RiskOut": {
+        "description": "The risk engine's verdict on a signal.",
+        "properties": {
+          "assessed": {
+            "default": false,
+            "title": "Assessed",
+            "type": "boolean"
+          },
+          "kill_switch": {
+            "default": false,
+            "title": "Kill Switch",
+            "type": "boolean"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules_action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SignalAction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vetoes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VetoOut"
+            },
+            "title": "Vetoes",
+            "type": "array"
+          }
+        },
+        "title": "RiskOut",
+        "type": "object"
+      },
       "RiskStatus": {
         "properties": {
           "kill_switch": {
@@ -481,6 +575,11 @@
           "action": {
             "$ref": "#/components/schemas/SignalAction"
           },
+          "actionable": {
+            "default": false,
+            "title": "Actionable",
+            "type": "boolean"
+          },
           "candle_ts": {
             "format": "date-time",
             "title": "Candle Ts",
@@ -514,6 +613,14 @@
             },
             "title": "Reasons",
             "type": "array"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskOut",
+            "default": {
+              "assessed": false,
+              "kill_switch": false,
+              "vetoes": []
+            }
           },
           "rule_version": {
             "title": "Rule Version",
@@ -580,6 +687,39 @@
           "next_before_id"
         ],
         "title": "SignalsResponse",
+        "type": "object"
+      },
+      "SizeOut": {
+        "properties": {
+          "capital_share_pct": {
+            "title": "Capital Share Pct",
+            "type": "string"
+          },
+          "limited_by": {
+            "title": "Limited By",
+            "type": "string"
+          },
+          "notional": {
+            "title": "Notional",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "risk_amount": {
+            "title": "Risk Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity",
+          "notional",
+          "risk_amount",
+          "capital_share_pct",
+          "limited_by"
+        ],
+        "title": "SizeOut",
         "type": "object"
       },
       "Timeframe": {
@@ -666,6 +806,24 @@
           "environment"
         ],
         "title": "VersionResponse",
+        "type": "object"
+      },
+      "VetoOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text"
+        ],
+        "title": "VetoOut",
         "type": "object"
       }
     }

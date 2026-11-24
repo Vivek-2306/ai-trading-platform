@@ -22,6 +22,44 @@ class ReasonOut(BaseModel):
     weight: float = 0.0
 
 
+class VetoOut(BaseModel):
+    code: str
+    text: str
+
+
+class PlanOut(BaseModel):
+    """Prices as exact decimal strings."""
+
+    entry: Decimal
+    stop: Decimal
+    target: Decimal
+    risk_per_unit: Decimal
+    reward_per_unit: Decimal
+    risk_reward: Decimal
+
+
+class SizeOut(BaseModel):
+    quantity: Decimal
+    notional: Decimal
+    risk_amount: Decimal
+    capital_share_pct: Decimal
+    limited_by: str
+
+
+class RiskOut(BaseModel):
+    """The risk engine's verdict on a signal."""
+
+    # False for signals from before the risk engine existed: treat them as not actionable.
+    assessed: bool = False
+    # What the rule engine said before the risk veto (a refused BUY reads BUY here and
+    # NO_TRADE in `action`).
+    rules_action: SignalAction | None = None
+    kill_switch: bool = False
+    vetoes: list[VetoOut] = []
+    plan: PlanOut | None = None  # only for an actionable BUY
+    size: SizeOut | None = None
+
+
 class SignalOut(BaseModel):
     id: int
     instrument_id: int
@@ -36,6 +74,9 @@ class SignalOut(BaseModel):
     inputs: dict[str, Any]
     rule_version: str
     created_at: datetime
+    risk: RiskOut = RiskOut()
+    # BUY or SELL that passed the risk veto and is not stale. Everything else: do nothing.
+    actionable: bool = False
     # True when the candle this signal is about is old (feed or job stopped): do not act on it.
     stale: bool = False
 
@@ -49,6 +90,19 @@ class SignalsResponse(BaseModel):
 def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) -> SignalOut:
     now = now or datetime.now(UTC)
     seconds = Timeframe(signal.timeframe).seconds
+    record = signal.risk or {}
+    action = SignalAction(signal.action)
+    is_stale = (now - signal.candle_ts).total_seconds() > seconds * STALE_AFTER_CANDLES
+    assessed = record.get("assessed") is True
+    show_plan = assessed and action is SignalAction.BUY
+    risk = RiskOut(
+        assessed=assessed,
+        rules_action=record.get("rules_action"),
+        kill_switch=bool(record.get("kill_switch", False)),
+        vetoes=[VetoOut(**v) for v in record.get("vetoes", [])],
+        plan=PlanOut(**record["plan"]) if show_plan and "plan" in record else None,
+        size=SizeOut(**record["size"]) if show_plan and "size" in record else None,
+    )
     return SignalOut(
         id=signal.id,
         instrument_id=signal.instrument_id,
@@ -62,7 +116,9 @@ def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) ->
         inputs=signal.inputs,
         rule_version=signal.rule_version,
         created_at=signal.created_at,
-        stale=(now - signal.candle_ts).total_seconds() > seconds * STALE_AFTER_CANDLES,
+        risk=risk,
+        actionable=assessed and not is_stale and action in (SignalAction.BUY, SignalAction.SELL),
+        stale=is_stale,
     )
 
 

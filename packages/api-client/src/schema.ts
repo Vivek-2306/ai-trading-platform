@@ -366,6 +366,24 @@ export interface components {
             /** Target Atr Multiple */
             target_atr_multiple: string;
         };
+        /**
+         * PlanOut
+         * @description Prices as exact decimal strings.
+         */
+        PlanOut: {
+            /** Entry */
+            entry: string;
+            /** Reward Per Unit */
+            reward_per_unit: string;
+            /** Risk Per Unit */
+            risk_per_unit: string;
+            /** Risk Reward */
+            risk_reward: string;
+            /** Stop */
+            stop: string;
+            /** Target */
+            target: string;
+        };
         /** QualityResponse */
         QualityResponse: {
             /** Instruments */
@@ -399,6 +417,30 @@ export interface components {
              */
             weight: number;
         };
+        /**
+         * RiskOut
+         * @description The risk engine's verdict on a signal.
+         */
+        RiskOut: {
+            /**
+             * Assessed
+             * @default false
+             */
+            assessed: boolean;
+            /**
+             * Kill Switch
+             * @default false
+             */
+            kill_switch: boolean;
+            plan?: components["schemas"]["PlanOut"] | null;
+            rules_action?: components["schemas"]["SignalAction"] | null;
+            size?: components["schemas"]["SizeOut"] | null;
+            /**
+             * Vetoes
+             * @default []
+             */
+            vetoes: components["schemas"]["VetoOut"][];
+        };
         /** RiskStatus */
         RiskStatus: {
             kill_switch: components["schemas"]["KillSwitchOut"];
@@ -414,6 +456,11 @@ export interface components {
         /** SignalOut */
         SignalOut: {
             action: components["schemas"]["SignalAction"];
+            /**
+             * Actionable
+             * @default false
+             */
+            actionable: boolean;
             /**
              * Candle Ts
              * Format: date-time
@@ -436,6 +483,14 @@ export interface components {
             instrument_id: number;
             /** Reasons */
             reasons: components["schemas"]["ReasonOut"][];
+            /**
+             * @default {
+             *       "assessed": false,
+             *       "kill_switch": false,
+             *       "vetoes": []
+             *     }
+             */
+            risk: components["schemas"]["RiskOut"];
             /** Rule Version */
             rule_version: string;
             /**
@@ -456,6 +511,19 @@ export interface components {
             next_before_id: number | null;
             /** Signals */
             signals: components["schemas"]["SignalOut"][];
+        };
+        /** SizeOut */
+        SizeOut: {
+            /** Capital Share Pct */
+            capital_share_pct: string;
+            /** Limited By */
+            limited_by: string;
+            /** Notional */
+            notional: string;
+            /** Quantity */
+            quantity: string;
+            /** Risk Amount */
+            risk_amount: string;
         };
         /**
          * Timeframe
@@ -486,6 +554,13 @@ export interface components {
             name: string;
             /** Version */
             version: string;
+        };
+        /** VetoOut */
+        VetoOut: {
+            /** Code */
+            code: string;
+            /** Text */
+            text: string;
         };
     };
     responses: never;

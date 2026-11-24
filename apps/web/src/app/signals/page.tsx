@@ -1,12 +1,16 @@
 import { AutoRefresh } from "@/components/auto-refresh";
 import { ActionBadge, formatCandleTime, SignalCard } from "@/components/signal-card";
 import { Card } from "@/components/ui/card";
-import { getLatestSignals, getRecentSignals } from "@/lib/api";
+import { getLatestSignals, getRecentSignals, getRiskStatus } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function Signals() {
-  const [latest, recent] = await Promise.all([getLatestSignals(), getRecentSignals(20)]);
+  const [latest, recent, risk] = await Promise.all([
+    getLatestSignals(),
+    getRecentSignals(20),
+    getRiskStatus(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -18,6 +22,16 @@ export default async function Signals() {
           answer, and agreement is a score of how much the rules agree, not a chance of winning.
         </p>
       </div>
+
+      {risk?.kill_switch.active && (
+        <div role="alert" className="glass rounded-2xl border border-bad/50 bg-bad/10 p-4">
+          <p className="font-semibold text-bad">Kill switch is ON: no signal is actionable.</p>
+          <p className="mt-1 text-sm">
+            {risk.kill_switch.reason}
+            {risk.kill_switch.actor ? ` (by ${risk.kill_switch.actor})` : ""}
+          </p>
+        </div>
+      )}
 
       {latest === null ? (
         <Card>
@@ -39,6 +53,21 @@ export default async function Signals() {
             <SignalCard key={signal.id} signal={signal} />
           ))}
         </div>
+      )}
+
+      {risk && (
+        <Card>
+          <h2 className="font-medium">Risk limits</h2>
+          <p className="mt-2 text-sm text-muted">
+            Every BUY is checked against these before it can be actionable. Risk per trade{" "}
+            {risk.limits.risk_per_trade_pct}% of capital (
+            {Number(risk.limits.capital).toLocaleString("en-US")} USDT), at most{" "}
+            {risk.limits.max_capital_share_pct}% of capital in one position, no new entries after
+            losing {risk.limits.max_daily_loss_pct}% in a day, at most{" "}
+            {risk.limits.max_open_positions} open positions, and at least{" "}
+            {risk.limits.min_risk_reward} of reward per 1 of risk.
+          </p>
+        </Card>
       )}
 
       {recent && recent.length > 0 && (

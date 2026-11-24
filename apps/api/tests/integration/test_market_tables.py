@@ -27,8 +27,21 @@ def _risk(action: str) -> dict[str, object]:
     """A risk record as the veto layer writes it (a BUY must carry its plan and size)."""
     record: dict[str, object] = {"assessed": True, "vetoes": []}
     if action == "BUY":
-        record["plan"] = {"entry": "100", "stop": "97", "target": "106"}
-        record["size"] = {"quantity": "1"}
+        record["plan"] = {
+            "entry": "100",
+            "stop": "97",
+            "target": "106",
+            "risk_per_unit": "3",
+            "reward_per_unit": "6",
+            "risk_reward": "2.00",
+        }
+        record["size"] = {
+            "quantity": "1",
+            "notional": "100",
+            "risk_amount": "3",
+            "capital_share_pct": "10",
+            "limited_by": "risk",
+        }
     return record
 
 
@@ -1025,7 +1038,7 @@ def test_signal_run_stores_one_signal_per_candle(
     assert out["unknown"] is None
     row = out["row"]
     assert row.n == 1 and row.ts == last_candle  # type: ignore[attr-defined]
-    assert row.version == "rules-v1" and row.explained and row.has_inputs  # type: ignore[attr-defined]
+    assert row.version == "rules-v2" and row.explained and row.has_inputs  # type: ignore[attr-defined]
 
 
 def test_signal_task_survives_a_failing_instrument(
