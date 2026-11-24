@@ -1,0 +1,22 @@
+{
+  "name": "@aitp/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "cd ../../apps/api && PYTHONPATH=. uv run python scripts/export_openapi.py ../../packages/api-client/openapi.json && cd ../../packages/api-client && openapi-typescript openapi.json -o src/schema.ts",
+    "check:fresh": "pnpm generate && git diff --exit-code -- openapi.json src/schema.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}

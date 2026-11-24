@@ -81,6 +81,8 @@ Python backend included (`apps/api/package.json` wraps the uv commands).
 | Dev DB + Redis | `pnpm infra:up` / `infra:down` / `infra:logs` / `infra:ps` | Postgres 17 + TimescaleDB + pgvector on 127.0.0.1:5432, Redis on :6379 |
 | Migrate DB | `pnpm db:migrate` | `uv run alembic upgrade head` · `downgrade -1` · `revision --autogenerate -m "..."` (import new models in `app/data/models/__init__.py`) |
 | Workers | `pnpm worker` / `pnpm beat` | `uv run celery -A app.worker.celery_app worker` / `beat` (needs `pnpm infra:up`) |
+| Web app | `pnpm --filter @aitp/web dev` | http://localhost:3000 (needs the API running; `/api/*` is proxied to it) |
+| Phone/tablet preview | `pnpm tunnel` | Builds the web app, opens an ngrok URL, prints it. Needs the API running and ngrok signed in. |
 | Run API | `pnpm dev` | `uv run uvicorn app.main:create_app --factory --reload` → http://localhost:8000/docs |
 
 Python config lives in `apps/api/pyproject.toml` (Ruff rules, mypy strict + pydantic plugin,

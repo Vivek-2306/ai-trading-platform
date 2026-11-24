@@ -1,11 +1,12 @@
 # Progress
 
-**Last updated:** 2026-11-23 (laptop)
+**Last updated:** 2026-11-24 (laptop)
 
 ## Current phase
 
-**Phase 3 — Local infrastructure and data layer** on `phase-3-data-layer` (AITP-12 … AITP-17).
-Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and closed out.
+**Phase 4 — Web app skeleton** on `phase-4-web-skeleton` (AITP-18 … 23, plus AITP-36 env/logging and
+AITP-37 ngrok tunnel). Phases 1–3 merged into `develop` (PRs #1–#3).
+**Phase 4b — API reference, Postman, logging** (AITP-38 … 40) follows on `phase-4b-api-docs`.
 
 ## Last completed
 
@@ -48,21 +49,20 @@ Phases 1 and 2 merged into `develop` (PR #1 `45fbeb7`, PR #2 `69227c1`) and clos
 - AITP-17 integration tests (5) with testcontainers, in CI; dev DB image switched to pinned `timescale/timescaledb:2.32.1-pg17`.
 - Self-review fixes (`%` in DB passwords, startup cleanup, Celery visibility timeout and no redelivery loops, heartbeat results off, `pnpm beat` on fresh clones); 53 unit + 5 integration tests.
 
+- Phase 3 merged (PR #3, `892f48f`). Phase 4 started: AITP-18 Next.js 16 app in `apps/web` (strict TS, `/api/*` proxied to the API, repo-root env file loaded).
+- AITP-19 responsive glass UI shell (Tailwind v4, dark/light, bottom nav on phones), AITP-20 Biome + Vitest, AITP-21 `packages/api-client` generated from OpenAPI (CI checks it is fresh), AITP-22 live system status page (API/DB/Redis; verified Redis down → shows Down), AITP-36 validated env + pino logs + one request ID across web and API logs, AITP-37 `pnpm tunnel` (ngrok; verified from the public URL), AITP-23 web CI job. 10 web tests.
+
 ## In progress
 
-Phase 3 PR #3 into `develop` (owner review): https://github.com/Vivek-2306/ai-trading-platform/pull/3
-CI green in 1m14s, including integration tests against real TimescaleDB + Redis.
+Phase 4 finishing: self-review, then PR into `develop`.
 
 ## Next up
 
-1. Owner reviews and merges PR #3; then `/release-phase 3`.
-2. Phase 4 — Web app skeleton (AITP-18 … AITP-23) after the owner says "go".
-3. Owner decisions on permissions:
-   - The deny rule `Bash(* .env.*)` is too broad (blocks any command that merely mentions an
-     env file name, e.g. commit messages). Proposed: narrow it to reader commands.
-   - `Read(**/.env.*)` also blocks *editing* the example env file. Pending addition there:
-     `POSTGRES_PORT=5432` and `REDIS_PORT=6379` (optional; the compose file has defaults).
-     Either the owner adds them, or allows Claude to edit the example file.
+1. Owner reviews and merges the Phase 4 PR; then `/release-phase 4`.
+2. Phase 4b (AITP-38 … 40): Notion API Reference, Postman collection, logging hardening.
+3. Owner: add `API_URL=http://127.0.0.1:8000`, `POSTGRES_PORT=5432`, `REDIS_PORT=6379` to `.env.example`
+   (Claude cannot edit that file), and run `cp .env.example .env` for local use.
+4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule (it blocks harmless commands).
 
 ## Open questions (owner decisions)
 
