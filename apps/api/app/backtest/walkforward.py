@@ -16,7 +16,6 @@ from app.backtest.engine import (
     BacktestConfig,
     BacktestResult,
     Strategy,
-    default_strategy,
     run_backtest,
 )
 from app.backtest.splits import Splits, Window, candles_for, walk_forward_windows
@@ -36,7 +35,7 @@ def walk_forward(
     train_size: int,
     test_size: int,
     step: int | None = None,
-    strategy: Strategy = default_strategy,
+    strategy: Strategy | None = None,
 ) -> list[WindowResult]:
     """One backtest per test window, using candles only from the tuning region."""
     tuning = splits.tuning
@@ -48,7 +47,7 @@ def walk_forward(
 
 
 def run_on_tuning(
-    splits: Splits, config: BacktestConfig, strategy: Strategy = default_strategy
+    splits: Splits, config: BacktestConfig, strategy: Strategy | None = None
 ) -> BacktestResult:
     """The whole tuning region in one run (the number you may tune against)."""
     return run_backtest(splits.tuning, config, strategy)
@@ -63,7 +62,7 @@ def oos_feed(splits: Splits, config: BacktestConfig) -> list[RawCandle]:
 
 
 def judge_oos(
-    splits: Splits, config: BacktestConfig, strategy: Strategy = default_strategy
+    splits: Splits, config: BacktestConfig, strategy: Strategy | None = None
 ) -> BacktestResult:
     """Judge ONE configuration on the locked period."""
     return run_backtest(oos_feed(splits, config), config, strategy)

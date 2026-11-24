@@ -169,6 +169,9 @@ def default_strategy(table: FeatureTable) -> Decision:
     return evaluate(table)
 
 
+FeaturesFn = Callable[[CandleSeries], FeatureTable]
+
+
 def _slip(price: Decimal, bps: Decimal, side: str) -> Decimal:
     factor = bps / 10_000
     return price * (1 + factor) if side == "buy" else price * (1 - factor)
@@ -181,9 +184,10 @@ def _fee(notional: Decimal, fee_pct: Decimal) -> Decimal:
 def run_backtest(
     candles: list[RawCandle],
     config: BacktestConfig,
-    strategy: Strategy = default_strategy,
+    strategy: Strategy | None = None,
     *,
     ask_at_last: bool = False,
+    features_fn: FeaturesFn | None = None,
 ) -> BacktestResult:
     """Replay `candles` (oldest first) through the strategy and the risk engine.
 
@@ -193,8 +197,13 @@ def run_backtest(
     if len(candles) < MIN_CANDLES + 2:
         raise ValueError(f"need at least {MIN_CANDLES + 2} candles to backtest")
     ordered = sorted(candles, key=lambda c: c.ts)
+    if strategy is None:
+        from app.backtest.registry import resolve  # late: the registry imports strategies
+
+        chosen = resolve(config.strategy)
+        strategy, features_fn = chosen.decide, features_fn or chosen.features
     series = CandleSeries.from_candles(ordered)
-    features = compute_features(series)  # causal: the value at t only uses candles up to t
+    features = (features_fn or compute_features)(series)  # causal: value at t uses candles <= t
     n = len(ordered)
     step = quantity_step(config.symbol)
 

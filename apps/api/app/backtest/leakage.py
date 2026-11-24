@@ -21,6 +21,7 @@ from app.analysis.features import MIN_CANDLES
 from app.backtest.engine import (
     BacktestConfig,
     BacktestResult,
+    FeaturesFn,
     Strategy,
     default_strategy,
     run_backtest,
@@ -46,11 +47,12 @@ def find_backtest_lookahead(
     config: BacktestConfig,
     make_strategy: StrategyFactory = real_rules,
     cuts: Sequence[int] | None = None,
+    features_fn: FeaturesFn | None = None,
 ) -> list[Leak]:
     """Empty list = no look-ahead found at the chosen cut points."""
     ordered = sorted(candles, key=lambda c: c.ts)
     n = len(ordered)
-    full = run_backtest(ordered, config, make_strategy(ordered))
+    full = run_backtest(ordered, config, make_strategy(ordered), features_fn=features_fn)
     full_decisions = dict(full.decisions)
     points = list(cuts) if cuts is not None else [n * k // 5 for k in range(2, 5)]
     points = [c for c in points if c >= MIN_CANDLES + 3]  # shorter histories cannot be run
@@ -59,7 +61,9 @@ def find_backtest_lookahead(
         head = ordered[:cut]
         # Ask at the last candle too: that is where a strategy that peeks one candle ahead has
         # nothing to peek at, and so decides differently from the full run.
-        short = run_backtest(head, config, make_strategy(head), ask_at_last=True)
+        short = run_backtest(
+            head, config, make_strategy(head), ask_at_last=True, features_fn=features_fn
+        )
         for index, action in short.decisions:
             if index in full_decisions and full_decisions[index] != action:
                 leaks.append(
