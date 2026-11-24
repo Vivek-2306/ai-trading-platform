@@ -11,6 +11,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `instruments` and `candles` tables (candles is a TimescaleDB hypertable with exact `NUMERIC` prices, UTC times, one row per instrument, timeframe and open time) and migration `0002` (AITP-41).
 - Market data adapter interface and a Binance public-data adapter (`ccxt`, no API key): closed candles only, exact `Decimal` prices, retries with backoff on rate limits, reusable contract test. `ccxt` and `tenacity` are now runtime dependencies so the worker image has them (AITP-42).
 - Twelve Data adapter for XAU/USD gold, enabled by the optional `TWELVE_DATA_API_KEY`; gold defaults to `PAXG/USDT` on Binance without a key. The API key never appears in errors or logs (AITP-43).
+- Historical backfill: `backfill_candles` Celery task loads N years for an instrument and timeframe page by page, logs progress, and is safe to re-run (existing candles are skipped). Default instrument list in `app/data/universe.py` (AITP-44).
 
 ## [0.1.0] - 2026-11-24
 

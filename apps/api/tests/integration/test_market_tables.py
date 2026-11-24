@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -118,3 +118,82 @@ def test_bad_candles_are_rejected(postgres_url: str) -> None:
             await session.rollback()
 
     _run(postgres_url, work)
+
+
+def test_insert_candles_is_idempotent(postgres_url: str) -> None:
+    from app.data.adapters.base import RawCandle
+    from app.data.models import AssetClass, Timeframe
+    from app.data.repository import get_or_create_instrument, insert_candles, latest_candle_time
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    candles = [
+        RawCandle(
+            T0 + timedelta(hours=i),
+            Decimal(1),
+            Decimal(2),
+            Decimal(1),
+            Decimal(2),
+            Decimal(3),
+        )
+        for i in range(5)
+    ]
+
+    async def work(session: AsyncSession) -> tuple[int, int, int, datetime | None, bool]:
+        # Own symbol: the database is shared by every test in the session.
+        spec = InstrumentSpec("binance", "SOL/USDT", AssetClass.CRYPTO)
+        first = await get_or_create_instrument(session, spec)
+        again = await get_or_create_instrument(session, spec)
+        new_first = await insert_candles(session, first.id, Timeframe.H1, candles)
+        new_second = await insert_candles(session, first.id, Timeframe.H1, candles[:3])
+        latest = await latest_candle_time(session, first.id, Timeframe.H1)
+        return new_first, new_second, len(candles), latest, first.id == again.id
+
+    new_first, new_second, total, latest, same_instrument = _run(postgres_url, work)
+    assert (new_first, new_second) == (5, 0)
+    assert latest == candles[-1].ts
+    assert same_instrument
+    assert total == 5
+
+
+def test_backfill_task_stores_candles_and_a_rerun_adds_none(
+    postgres_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import Settings
+    from app.data.adapters.base import RawCandle
+    from app.worker import tasks
+
+    _migrate(postgres_url)
+    recent = datetime.now(UTC).replace(minute=0, second=0, microsecond=0) - timedelta(days=2)
+    source = [
+        RawCandle(
+            recent + timedelta(hours=i),
+            Decimal(1),
+            Decimal(2),
+            Decimal(1),
+            Decimal(2),
+            Decimal(3),
+        )
+        for i in range(30)
+    ]
+
+    class Fake:
+        venue = "binance"
+
+        async def fetch_candles(
+            self, symbol: str, timeframe: object, since: datetime | None = None, limit: int = 500
+        ) -> list[RawCandle]:
+            return [c for c in source if since is None or c.ts >= since][:limit]
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        tasks, "get_settings", lambda: Settings(_env_file=None, database_url=postgres_url)
+    )
+    monkeypatch.setattr(tasks, "build_adapter", lambda venue, settings: Fake())
+
+    first = tasks.backfill_candles.apply(args=("binance", "BTC/USDT", "crypto", "1h", 1)).get()
+    second = tasks.backfill_candles.apply(args=("binance", "BTC/USDT", "crypto", "1h", 1)).get()
+
+    assert (first, second) == (30, 0)
