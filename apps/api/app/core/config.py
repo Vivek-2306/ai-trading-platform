@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     twelve_data_api_key: SecretStr | None = None
     ai_model_bulk: str = "claude-haiku-5-5"  # cheap, high-volume work such as news tagging
     ai_model_reasoning: str = "claude-opus-5-5"  # final reasoning on a signal
+    # 1-minute candles older than this are deleted daily (0 keeps them forever). The 5m and 1h
+    # aggregates built from them are kept. 1h and 1d candles are never deleted.
+    candle_1m_retention_days: int = Field(default=90, ge=0)
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 

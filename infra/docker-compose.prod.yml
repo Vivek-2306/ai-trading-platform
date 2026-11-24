@@ -28,6 +28,8 @@ x-api: &api
     SENTRY_DSN: ${SENTRY_DSN:-}
     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+    TWELVE_DATA_API_KEY: ${TWELVE_DATA_API_KEY:-}
+    CANDLE_1M_RETENTION_DAYS: ${CANDLE_1M_RETENTION_DAYS:-90}
   depends_on:
     db: { condition: service_healthy }
     redis: { condition: service_healthy }

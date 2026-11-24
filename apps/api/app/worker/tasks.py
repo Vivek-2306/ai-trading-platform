@@ -13,6 +13,7 @@ from app.data.adapters.factory import build_adapter
 from app.data.backfill import backfill, years_ago
 from app.data.models import AssetClass, Timeframe
 from app.data.repository import get_or_create_instrument, insert_candles
+from app.data.retention import delete_old_minute_candles
 from app.data.universe import InstrumentSpec, default_universe
 from app.data.update import update_instrument
 from app.worker.celery_app import celery_app
@@ -101,3 +102,19 @@ async def _update_all() -> dict[str, int]:
 def update_candles() -> dict[str, int]:
     """Fetch new candles for every tracked instrument and refill recent gaps."""
     return asyncio.run(_update_all())
+
+
+async def _retention() -> int:
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    try:
+        sessions = async_sessionmaker(engine, expire_on_commit=False)
+        return await delete_old_minute_candles(sessions, settings.candle_1m_retention_days)
+    finally:
+        await engine.dispose()
+
+
+@celery_app.task(name="app.worker.tasks.apply_candle_retention", ignore_result=True)
+def apply_candle_retention() -> int:
+    """Delete 1m candles older than CANDLE_1M_RETENTION_DAYS. Safe to run twice."""
+    return asyncio.run(_retention())

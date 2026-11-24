@@ -10,6 +10,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import insert, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -488,3 +489,196 @@ def test_a_simulated_stream_drop_is_healed_by_rest_backfill(postgres_url: str) -
     assert new == 4  # minutes 5-8
     assert gap_logs == 1  # the gap was logged
     assert total == 14
+
+
+def test_aggregates_compression_and_retention(postgres_url: str) -> None:
+    from sqlalchemy import insert as core_insert
+
+    from app.data.models import AssetClass
+    from app.data.repository import get_or_create_instrument
+    from app.data.retention import delete_old_minute_candles
+    from app.data.universe import InstrumentSpec
+
+    _migrate(postgres_url)
+    start = datetime(2026, 1, 5, 10, 0, tzinfo=UTC)  # 2 hours of 1m candles
+    minutes = [start + timedelta(minutes=i) for i in range(120)]
+
+    def row(instrument_id: int, ts: datetime, i: int, timeframe: str = "1m") -> dict[str, object]:
+        base = Decimal(100 + i)
+        return {
+            "instrument_id": instrument_id,
+            "timeframe": timeframe,
+            "ts": ts,
+            "open": base,
+            "high": base + 2,
+            "low": base - 1,
+            "close": base + 1,
+            "volume": Decimal(2),
+        }
+
+    async def work(session: AsyncSession) -> dict[str, object]:
+        spec = InstrumentSpec("binance", "AVAX/USDT", AssetClass.CRYPTO)
+        instrument = await get_or_create_instrument(session, spec)
+        await session.commit()
+        iid = instrument.id
+        await session.execute(
+            core_insert(Candle), [row(iid, ts, i) for i, ts in enumerate(minutes)]
+        )
+        await session.commit()
+        out: dict[str, object] = {}
+
+        # Real-time aggregates match the raw candles before any refresh.
+        five = (
+            await session.execute(
+                text(
+                    "SELECT bucket, open, high, low, close, volume, candles FROM candles_5m_agg "
+                    "WHERE instrument_id = :i ORDER BY bucket LIMIT 2"
+                ),
+                {"i": iid},
+            )
+        ).all()
+        out["first_5m"] = (
+            five[0].open,
+            five[0].high,
+            five[0].low,
+            five[0].close,
+            five[0].volume,
+            five[0].candles,
+        )
+        hour = (
+            await session.execute(
+                text(
+                    "SELECT open, high, low, close, volume, candles FROM candles_1h_agg "
+                    "WHERE instrument_id = :i ORDER BY bucket LIMIT 1"
+                ),
+                {"i": iid},
+            )
+        ).one()
+        out["first_1h"] = tuple(hour)
+
+        # Compression: compress every chunk, then duplicate and new inserts must still work.
+        await session.execute(text("SELECT compress_chunk(c, true) FROM show_chunks('candles') c"))
+        await session.commit()
+        dup = await session.execute(
+            pg_insert(Candle).values(row(iid, minutes[0], 0)).on_conflict_do_nothing()
+        )
+        late = await session.execute(
+            pg_insert(Candle)
+            .values(row(iid, start + timedelta(minutes=500), 500))
+            .on_conflict_do_nothing()
+        )
+        await session.commit()
+        out["dup_inserted"] = dup.rowcount  # type: ignore[attr-defined]
+        out["new_inserted"] = late.rowcount  # type: ignore[attr-defined]
+
+        # Materialize the aggregates (needs autocommit), so they outlive the raw rows below.
+        async with session.bind.connect() as conn:  # type: ignore[union-attr]
+            auto = await conn.execution_options(isolation_level="AUTOCOMMIT")
+            await auto.execute(
+                text(
+                    "CALL refresh_continuous_aggregate("
+                    "'candles_5m_agg', '2026-01-01', '2026-01-10')"
+                )
+            )
+
+        # Retention: old 1m rows go, old 1h rows stay, recent 1m rows stay.
+        await session.execute(core_insert(Candle), [row(iid, start - timedelta(days=200), 0, "1h")])
+        await session.commit()
+        sessions = async_sessionmaker(session.bind, expire_on_commit=False)
+        out["deleted"] = await delete_old_minute_candles(
+            sessions, 90, now=start + timedelta(days=100)
+        )
+        remaining = await session.execute(
+            text(
+                "SELECT timeframe, count(*) FROM candles "
+                "WHERE instrument_id = :i GROUP BY 1 ORDER BY 1"
+            ),
+            {"i": iid},
+        )
+        out["remaining"] = {r[0]: r[1] for r in remaining}
+        out["kept_5m"] = (
+            await session.execute(
+                text("SELECT count(*) FROM candles_5m_agg WHERE instrument_id = :i"), {"i": iid}
+            )
+        ).scalar_one()
+        return out
+
+    out = _run(postgres_url, work)
+    # Minutes 0-4 have open 100..104, high 102..106, low 99..103, close 101..105, volume 2 each.
+    assert out["first_5m"] == (
+        Decimal(100),
+        Decimal(106),
+        Decimal(99),
+        Decimal(105),
+        Decimal(10),
+        5,
+    )
+    # The first hour (minutes 0-59): open 100, high 161, low 99, close 160, volume 120, 60 candles.
+    assert out["first_1h"] == (
+        Decimal(100),
+        Decimal(161),
+        Decimal(99),
+        Decimal(160),
+        Decimal(120),
+        60,
+    )
+    assert out["dup_inserted"] == 0
+    assert out["new_inserted"] == 1
+    assert out["deleted"] == 121  # all 1m rows are older than 90 days at "now"
+    assert out["remaining"] == {"1h": 1}
+    assert isinstance(out["kept_5m"], int) and out["kept_5m"] >= 24  # 2 hours of 5m buckets survive
+
+
+def test_five_minute_candles_come_from_the_aggregate(postgres_url: str, redis_url: str) -> None:
+    from fastapi.testclient import TestClient
+    from sqlalchemy import insert as core_insert
+
+    from app.core.config import Settings
+    from app.data.models import AssetClass
+    from app.data.repository import get_or_create_instrument
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+
+    _migrate(postgres_url)
+    start = datetime(2026, 2, 3, 9, 0, tzinfo=UTC)
+
+    async def seed(session: AsyncSession) -> int:
+        instrument = await get_or_create_instrument(
+            session, InstrumentSpec("binance", "DOT/USDT", AssetClass.CRYPTO)
+        )
+        await session.commit()
+        rows = [
+            {
+                "instrument_id": instrument.id,
+                "timeframe": "1m",
+                "ts": start + timedelta(minutes=i),
+                "open": Decimal(10 + i),
+                "high": Decimal(12 + i),
+                "low": Decimal(9 + i),
+                "close": Decimal(11 + i),
+                "volume": Decimal(1),
+            }
+            for i in range(13)  # two full buckets and a partial third
+        ]
+        await session.execute(core_insert(Candle), rows)
+        await session.commit()
+        return instrument.id
+
+    instrument_id = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+    with TestClient(create_app(settings)) as client:
+        body = client.get(
+            "/data/candles", params={"instrument_id": instrument_id, "timeframe": "5m"}
+        ).json()
+
+    assert [c["ts"][:16] for c in body["candles"]] == ["2026-02-03T09:00", "2026-02-03T09:05"]
+    first = body["candles"][0]
+    assert (first["open"], first["high"], first["low"], first["close"], first["volume"]) == (
+        "10.0000000000",
+        "16.0000000000",
+        "9.0000000000",
+        "15.0000000000",
+        "5.0000000000",
+    )  # the partial 09:10 bucket is not returned
