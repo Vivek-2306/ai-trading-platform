@@ -34,9 +34,9 @@ Get a SEBI-focused lawyer's view before any public launch.
 
 Mirrored in `docs/PROGRESS.md` → Open questions. Record answers there and here.
 
-- [ ] Personal tool only, or a public product later?
-- [ ] MVP markets: Indian equities + crypto first?
-- [ ] Indian broker: Zerodha (Kite Connect), Upstox or Angel One?
-- [ ] MVP hosting: low-cost server or AWS from day one?
-- [ ] Monthly MVP budget ceiling.
-- [ ] Mobile app phase (proposed: after web signals + paper trading).
+- [x] Personal tool only (answered 2026-11-24).
+- [x] MVP markets: crypto first, Indian markets later (2026-11-24).
+- [ ] Indian broker: undecided, not urgent until Indian markets start.
+- [x] MVP hosting: single server; Docker + free tiers in development (2026-11-24).
+- [x] Budget: near zero in development; cloud plans later (2026-11-24).
+- [x] Mobile app: after the web app (2026-11-24).
