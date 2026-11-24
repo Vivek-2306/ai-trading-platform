@@ -34,3 +34,16 @@ def test_collection_is_deterministic() -> None:
     module = _load_script()
 
     assert module.build_collection(schema) == module.build_collection(schema)
+
+
+def test_path_parameters_use_postman_syntax() -> None:
+    schema = {
+        "info": {"title": "T", "version": "1"},
+        "paths": {"/items/{item_id}": {"get": {"summary": "Get item", "responses": {"200": {}}}}},
+    }
+
+    url = _load_script().build_collection(schema)["item"][0]["item"][0]["request"]["url"]
+
+    assert url["raw"] == "{{baseUrl}}/items/:item_id"
+    assert url["path"] == ["items", ":item_id"]
+    assert [v["key"] for v in url["variable"]] == ["item_id"]

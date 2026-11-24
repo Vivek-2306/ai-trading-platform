@@ -15,6 +15,8 @@ REQUEST_ID_HEADER = "X-Request-ID"
 # Reuse a caller's ID only if it looks sane; never echo arbitrary input into logs.
 _VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
+_PROBE_PATHS = frozenset({"/health", "/health/ready"})
+
 logger = get_logger(__name__)
 
 
@@ -43,7 +45,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
-            # Probes hit health endpoints every few seconds: keep them out of normal logs.
-            log = logger.debug if request.url.path.startswith("/health") else logger.info
+            # Probes hit the health endpoints every few seconds: keep the healthy ones out of
+            # normal logs, but never hide a failing probe.
+            quiet = request.url.path in _PROBE_PATHS and status < 400
+            log = logger.debug if quiet else logger.info
             log("request", status=status, duration_ms=duration_ms)
             structlog.contextvars.clear_contextvars()

@@ -136,3 +136,18 @@ def test_health_probes_are_not_logged_at_info(client: TestClient) -> None:
         client.get("/health/ready")
 
     assert not [log for log in logs if log["event"] == "request"]
+
+
+def test_failing_health_probe_is_logged_at_info(client: TestClient) -> None:
+    client.app.state.readiness_checks["broken"] = _down  # type: ignore[attr-defined]
+
+    with capture_logs() as logs:
+        response = client.get("/health/ready")
+
+    entry = next(log for log in logs if log["event"] == "request")
+    assert response.status_code == 503
+    assert entry["log_level"] == "info"
+
+
+async def _down() -> bool:
+    return False

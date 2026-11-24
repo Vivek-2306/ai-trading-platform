@@ -5,6 +5,7 @@ Usage: python scripts/export_postman.py <output directory>
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,9 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 def _request_item(path: str, method: str, op: dict[str, Any]) -> dict[str, Any]:
     expected = sorted(int(code) for code in op.get("responses", {}) if code.isdigit())
     ok = next((code for code in expected if 200 <= code < 300), 200)
+    # OpenAPI writes /items/{id}; Postman writes /items/:id and lists the variable.
+    path_params = re.findall(r"{(\w+)}", path)
+    postman_path = re.sub(r"{(\w+)}", r":\1", path)
     description = "\n\n".join(p for p in (op.get("summary"), op.get("description")) if p)
     codes = ", ".join(str(code) for code in expected)
     return {
@@ -39,9 +43,13 @@ def _request_item(path: str, method: str, op: dict[str, Any]) -> dict[str, Any]:
             "method": method.upper(),
             "header": [{"key": "Accept", "value": "application/json"}],
             "url": {
-                "raw": "{{baseUrl}}" + path,
+                "raw": "{{baseUrl}}" + postman_path,
                 "host": ["{{baseUrl}}"],
-                "path": [part for part in path.split("/") if part],
+                "path": [part for part in postman_path.split("/") if part],
+                "variable": [
+                    {"key": name, "value": "", "description": "path parameter"}
+                    for name in path_params
+                ],
             },
             "description": f"{description}\n\nDocumented responses: {codes}".strip(),
         },

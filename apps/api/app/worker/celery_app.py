@@ -41,6 +41,7 @@ def create_celery(settings: Settings) -> Celery:
         result_expires=24 * 3600,
         broker_connection_retry_on_startup=True,
         worker_hijack_root_logger=False,  # keep our structlog setup
+        worker_redirect_stdouts=False,  # else structlog's stdout lines would be logged twice
         beat_schedule={
             "heartbeat": {
                 "task": "app.worker.tasks.heartbeat",

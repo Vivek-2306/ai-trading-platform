@@ -37,7 +37,8 @@
               ],
               "path": [
                 "health"
-              ]
+              ],
+              "variable": []
             },
             "description": "Liveness check\n\nReturns ok while the process is up. It does not check dependencies; see /health/ready.\n\nDocumented responses: 200"
           }
@@ -72,7 +73,8 @@
               "path": [
                 "health",
                 "ready"
-              ]
+              ],
+              "variable": []
             },
             "description": "Readiness check\n\nChecks every dependency (database, and Redis once added). 503 if any is down.\n\nDocumented responses: 200, 503"
           }
@@ -106,7 +108,8 @@
               ],
               "path": [
                 "version"
-              ]
+              ],
+              "variable": []
             },
             "description": "Running version\n\nDocumented responses: 200"
           }
