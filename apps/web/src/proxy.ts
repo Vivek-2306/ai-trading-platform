@@ -17,7 +17,7 @@ export function proxy(request: NextRequest) {
 
   let response: NextResponse;
   if (pathname.startsWith("/api/")) {
-    const target = apiTarget(pathname, env().API_URL);
+    const target = apiTarget(pathname, env().API_URL, request.nextUrl.search);
     if (!target) {
       response = NextResponse.json({ error: "not_found" }, { status: 404 });
     } else {

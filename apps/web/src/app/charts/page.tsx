@@ -1,10 +1,13 @@
 import { ChartControls, type ChartTimeframe, TIMEFRAMES } from "@/components/chart-controls";
-import { PriceChart } from "@/components/price-chart";
+import { LiveChart } from "@/components/live-chart";
 import { Card } from "@/components/ui/card";
 import { getCandles, getInstruments } from "@/lib/api";
 import { toChartData } from "@/lib/chart-data";
+import { formingCandle } from "@/lib/live";
 
 export const dynamic = "force-dynamic";
+
+const SECONDS = { "1h": 3600, "1d": 86400 } as const;
 
 function Notice({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -51,7 +54,15 @@ export default async function Charts({
     ? (query.timeframe as ChartTimeframe)
     : "1h";
   const candles = await getCandles(selected.id, timeframe);
-  const data = candles ? toChartData(candles) : [];
+  const closed = candles ? toChartData(candles) : [];
+  // Stored candles are closed ones; add the one still forming, built from 5-minute candles.
+  const streamed = selected.venue === "binance";
+  const fiveMinute =
+    streamed && closed.length > 0 ? await getCandles(selected.id, "5m", 300) : null;
+  const forming = fiveMinute
+    ? formingCandle(toChartData(fiveMinute), closed[closed.length - 1]?.time, SECONDS[timeframe])
+    : null;
+  const data = forming ? [...closed, forming] : closed;
 
   return (
     <div className="space-y-6">
@@ -65,7 +76,12 @@ export default async function Charts({
         </Notice>
       ) : (
         <Card className="p-2 sm:p-4">
-          <PriceChart data={data} />
+          <LiveChart
+            data={data}
+            timeframe={timeframe}
+            symbol={selected.symbol}
+            streamed={streamed}
+          />
         </Card>
       )}
     </div>

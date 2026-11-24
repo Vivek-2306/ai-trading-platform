@@ -47,7 +47,7 @@ async def update_instrument(
 
     async def sink(candles: list[RawCandle]) -> int:
         async with sessions() as session:
-            return await insert_candles(session, instrument_id, timeframe, candles)
+            return await insert_candles(session, instrument_id, timeframe, candles, overwrite=True)
 
     start = latest + timedelta(seconds=timeframe.seconds) if latest else window_start
     new = await backfill(adapter, spec.symbol, timeframe, start, sink)

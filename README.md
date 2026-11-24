@@ -57,6 +57,8 @@ Run it:
 cd apps/api && uv run uvicorn app.main:create_app --factory --reload   # API  http://localhost:8000/docs
 pnpm --filter @aitp/web dev                                            # Web  http://localhost:3000
 pnpm worker                                                            # background jobs (optional)
+pnpm beat                                                              # schedules the hourly candle updates (optional)
+pnpm stream                                                            # live 1m candles from Binance (optional)
 pnpm tunnel                                                            # public URL for a phone/tablet
 ```
 

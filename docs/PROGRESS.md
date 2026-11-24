@@ -4,10 +4,10 @@
 
 ## Current phase
 
-**Phase 7 — Crypto and gold market data** on `phase-7-market-data` (AITP-41 … 48). v0.1.0 released
-2026-11-24. Later feature phases (7b, 8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
-Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike + adapter, 44 backfill job,
-45 incremental updates + gap refill, 46 data-quality checks, 47 API endpoints, 48 web price chart.
+**Phase 7b — Live streaming data** on `phase-7b-live-stream` (AITP-49 … 54). Phase 7 merged (PR #16).
+v0.1.0 released 2026-11-24. Later feature phases (8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
+Tickets: 49 stream service, 50 write 1m candles (Redis + TimescaleDB), 51 gap detection + REST backfill,
+52 aggregates/compression/retention, 53 live price API stream, 54 web live price on the chart.
 
 ## Last completed
 
@@ -63,15 +63,14 @@ Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike +
 
 ## In progress
 
-Phase 7 PR into `develop` (owner review).
+Phase 7b (live streaming), ticket by ticket.
 
 ## Next up
 
-1. Owner reviews and merges the Phase 7 PR; then `/release-phase 7`.
-2. Owner says "go" for Phase 7b (live streaming, `/start-phase 7b`).
-3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
-4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
-5. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
+1. Phase 7b in progress; the owner reviews and merges its PR when opened.
+2. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
+3. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
+4. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
 
 Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backtest → 9b scalping research → 10 ML → 11 news/AI → 12 paper trading.
 
@@ -85,6 +84,13 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 - [x] Mobile app: after the web app.
 
 ## Known issues
+
+- Phase 7b limitations (deliberate, to revisit): quiet minutes on thin symbols (e.g. PAXG) have no 1m candle
+  at all (Binance sends none), so the gap check reports them and the healer refetches them every 5 minutes;
+  the stream heartbeat is global (one busy symbol keeps it fresh); the SSE stream limit is global (50), not
+  per client; migration `0003` is not atomic (the aggregates are created outside a transaction, so a failed
+  run needs a manual fix); the ngrok tunnel was not re-tested because another tunnel (pid 65021) was
+  already running on this laptop.
 
 - Phase 7 limitations (deliberate, to revisit): exchange holidays for spot gold (Dec 25, Jan 1) show as
   candle gaps and are re-fetched hourly; the chart shows only the newest 500 candles (no scroll-back yet);

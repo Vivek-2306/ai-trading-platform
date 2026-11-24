@@ -25,6 +25,7 @@
     "db:migrate": "pnpm --filter @aitp/api db:migrate",
     "worker": "pnpm --filter @aitp/api worker",
     "beat": "pnpm --filter @aitp/api beat",
+    "stream": "pnpm --filter @aitp/api stream",
     "test:integration": "pnpm --filter @aitp/api test:integration",
     "tunnel": "bash scripts/tunnel.sh",
     "api:postman": "pnpm --filter @aitp/api postman",

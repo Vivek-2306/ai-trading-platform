@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.api.deps import SettingsDep
 from app.core.database import SessionDep
@@ -123,6 +123,8 @@ async def candles(
         before = before.replace(tzinfo=UTC)  # a time with no zone means UTC
     if await session.get(Instrument, instrument_id) is None:
         raise HTTPException(status_code=404, detail="Instrument not found")
+    if timeframe is Timeframe.M5:
+        return await _five_minute_candles(session, instrument_id, limit, before)
     statement = (
         select(Candle)
         .where(Candle.instrument_id == instrument_id, Candle.timeframe == timeframe.value)
@@ -141,4 +143,35 @@ async def candles(
             for c in rows
         ],
         next_before=rows[0].ts if len(rows) == limit else None,
+    )
+
+
+async def _five_minute_candles(
+    session: SessionDep, instrument_id: int, limit: int, before: datetime | None
+) -> CandlesResponse:
+    """5-minute candles are built from the 1-minute ones (a database aggregate). Only buckets
+    that have ended (a minute ago or earlier) are returned. A quiet market can have minutes
+    with no trades and so no 1-minute candle; those buckets are still returned."""
+    rows = (
+        await session.execute(
+            text(
+                "SELECT bucket, open, high, low, close, volume FROM candles_5m_agg "
+                "WHERE instrument_id = :id "
+                "AND bucket + INTERVAL '5 minutes' <= now() - INTERVAL '1 minute' "
+                "AND (CAST(:before AS timestamptz) IS NULL "
+                "OR bucket < CAST(:before AS timestamptz)) "
+                "ORDER BY bucket DESC LIMIT :limit"
+            ),
+            {"id": instrument_id, "before": before, "limit": limit},
+        )
+    ).all()
+    items = [
+        CandleOut(ts=r.bucket, open=r.open, high=r.high, low=r.low, close=r.close, volume=r.volume)
+        for r in reversed(rows)
+    ]
+    return CandlesResponse(
+        instrument_id=instrument_id,
+        timeframe=Timeframe.M5,
+        candles=items,
+        next_before=items[0].ts if len(items) == limit else None,
     )

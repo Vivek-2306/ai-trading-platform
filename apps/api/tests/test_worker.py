@@ -59,3 +59,15 @@ def test_beat_schedules_the_candle_update_hourly() -> None:
 
     assert entry["task"] == "app.worker.tasks.update_candles"
     assert entry["schedule"].minute == {2}
+
+
+def test_beat_schedules_daily_candle_retention() -> None:
+    entry = celery_app.conf.beat_schedule["candle-retention"]
+
+    assert entry["task"] == "app.worker.tasks.apply_candle_retention"
+    assert entry["schedule"].hour == {3}
+
+
+def test_retention_defaults_to_90_days_and_zero_keeps_everything() -> None:
+    assert Settings(_env_file=None).candle_1m_retention_days == 90
+    assert Settings(_env_file=None, candle_1m_retention_days=0).candle_1m_retention_days == 0

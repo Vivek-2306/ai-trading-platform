@@ -125,3 +125,19 @@ def test_a_naive_datetime_is_rejected() -> None:
             close=Decimal(1),
             volume=Decimal(0),
         )
+
+
+async def test_a_candle_is_not_trusted_until_it_has_settled() -> None:
+    # The last fixture candle opened 1h ago... 1 second ago it closed: too fresh to trust.
+    just_closed = datetime.fromtimestamp(1795503600 + 3600 + 1, tz=UTC)
+    settled = datetime.fromtimestamp(1795503600 + 3600 + 6, tz=UTC)
+
+    fresh = await BinanceAdapter(FakeExchange([FIXTURE]), clock=lambda: just_closed).fetch_candles(
+        "BTC/USDT", Timeframe.H1
+    )
+    done = await BinanceAdapter(FakeExchange([FIXTURE]), clock=lambda: settled).fetch_candles(
+        "BTC/USDT", Timeframe.H1
+    )
+
+    assert len(fresh) == len(FIXTURE) - 1
+    assert len(done) == len(FIXTURE)
