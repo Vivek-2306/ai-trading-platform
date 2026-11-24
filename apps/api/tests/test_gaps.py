@@ -81,3 +81,11 @@ def test_daily_candles() -> None:
     gaps = find_gaps(days, "binance", Timeframe.D1, MON, MON + timedelta(days=4))
 
     assert gaps == [Gap(MON + timedelta(days=2), MON + timedelta(days=2), 1)]
+
+
+def test_gold_weekend_follows_new_york_time_in_summer() -> None:
+    # In July New York is UTC-4, so the week closes Friday 21:00 UTC and reopens Sunday 21:00.
+    assert not market_closed("twelvedata", datetime(2026, 7, 10, 20, tzinfo=UTC))
+    assert market_closed("twelvedata", datetime(2026, 7, 10, 21, tzinfo=UTC))
+    assert market_closed("twelvedata", datetime(2026, 7, 12, 20, tzinfo=UTC))
+    assert not market_closed("twelvedata", datetime(2026, 7, 12, 21, tzinfo=UTC))

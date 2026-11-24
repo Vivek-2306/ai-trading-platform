@@ -1,20 +1,23 @@
 """Which candles should exist, and which are missing.
 
-Crypto trades 24/7. Spot gold (Twelve Data) is closed from Friday 22:00 UTC to Sunday 22:00 UTC,
-so candles that open in that window are not expected and their absence is not a gap. This is
-an approximation of the real forex week; it errs on the side of not raising false alarms.
+Crypto trades 24/7. Spot gold (Twelve Data) follows the forex week: closed from Friday 17:00 to
+Sunday 17:00 New York time (so 22:00 UTC in winter, 21:00 UTC in summer). Candles that open in
+that window are not expected and their absence is not a gap. Exchange holidays (Dec 25, Jan 1)
+are not modelled yet, so those days show up as gaps; see docs/PROGRESS.md.
 """
 
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.data.models import Timeframe
 
 # Venues whose market closes at the weekend. Binance (including PAXG) never closes.
 _WEEKEND_CLOSED_VENUES = {"twelvedata"}
 _FRIDAY, _SATURDAY, _SUNDAY = 4, 5, 6
-_CLOSE_HOUR_UTC = 22
+_MARKET_TZ = ZoneInfo("America/New_York")
+_CLOSE_HOUR_LOCAL = 17
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,14 +33,14 @@ def market_closed(venue: str, ts: datetime) -> bool:
     """True if a candle opening at `ts` is not expected because the market is shut."""
     if venue not in _WEEKEND_CLOSED_VENUES:
         return False
-    ts = ts.astimezone(UTC)
-    weekday = ts.weekday()
+    local = ts.astimezone(_MARKET_TZ)
+    weekday = local.weekday()
     if weekday == _SATURDAY:
         return True
     if weekday == _FRIDAY:
-        return ts.hour >= _CLOSE_HOUR_UTC
+        return local.hour >= _CLOSE_HOUR_LOCAL
     if weekday == _SUNDAY:
-        return ts.hour < _CLOSE_HOUR_UTC
+        return local.hour < _CLOSE_HOUR_LOCAL
     return False
 
 

@@ -1,6 +1,6 @@
 """Market data endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated
 
@@ -119,6 +119,8 @@ async def candles(
     ] = None,
 ) -> CandlesResponse:
     """The newest `limit` candles (oldest first). Page back in time with `next_before`."""
+    if before is not None and before.tzinfo is None:
+        before = before.replace(tzinfo=UTC)  # a time with no zone means UTC
     if await session.get(Instrument, instrument_id) is None:
         raise HTTPException(status_code=404, detail="Instrument not found")
     statement = (

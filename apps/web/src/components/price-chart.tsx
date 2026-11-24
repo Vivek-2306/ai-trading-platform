@@ -42,12 +42,14 @@ export function PriceChart({ data }: { data: ChartCandle[] }) {
     return () => chart.remove();
   }, [data, resolvedTheme]);
 
+  const first = data[0];
+  const last = data[data.length - 1];
+  const summary =
+    first && last
+      ? `Candlestick price chart, ${data.length} candles from ${new Date(first.time * 1000).toISOString().slice(0, 10)} to ${new Date(last.time * 1000).toISOString().slice(0, 10)}, last close ${last.close}`
+      : "Candlestick price chart";
+
   return (
-    <div
-      ref={container}
-      role="img"
-      aria-label="Candlestick price chart"
-      className="h-[55dvh] min-h-72 w-full"
-    />
+    <div ref={container} role="img" aria-label={summary} className="h-[55dvh] min-h-72 w-full" />
   );
 }

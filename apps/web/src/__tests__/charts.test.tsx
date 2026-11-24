@@ -51,7 +51,11 @@ describe("PriceChart", () => {
   it("draws the data and cleans up", () => {
     const data = toChartData([candle("2026-01-01T00:00:00Z")]);
     const { unmount } = render(<PriceChart data={data} />);
-    expect(screen.getByRole("img", { name: "Candlestick price chart" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "Candlestick price chart, 1 candles from 2026-01-01 to 2026-01-01, last close 101.5",
+      }),
+    ).toBeInTheDocument();
     expect(setData).toHaveBeenCalledWith(data);
     unmount();
     expect(remove).toHaveBeenCalled();

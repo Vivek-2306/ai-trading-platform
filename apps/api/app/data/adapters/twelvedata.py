@@ -4,6 +4,8 @@ Free plan (checked 2026-11-24): 8 credits per minute and 800 per day; one time_s
 costs 1 credit per symbol. Forex pairs have no volume, so volume is stored as 0.
 """
 
+import asyncio
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -51,11 +53,15 @@ class TwelveDataAdapter:
         *,
         attempts: int = 4,
         max_wait_seconds: float = 30.0,
+        min_interval_seconds: float = 8.0,
     ) -> None:
         self._key = api_key
         self._client = client or httpx.AsyncClient(base_url=BASE_URL, timeout=15)
         self._attempts = attempts
         self._max_wait = max_wait_seconds
+        # Free plan: 8 credits per minute. One call a few seconds apart stays under it.
+        self._min_interval = min_interval_seconds
+        self._last_call = float("-inf")
 
     async def fetch_candles(
         self, symbol: str, timeframe: Timeframe, since: datetime | None = None, limit: int = 500
@@ -85,6 +91,10 @@ class TwelveDataAdapter:
         return self._closed(payload, timeframe, label)
 
     async def _get(self, params: dict[str, str]) -> dict[str, object]:
+        wait = self._last_call + self._min_interval - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        self._last_call = time.monotonic()
         failure: str | None = None
         try:
             response = await self._client.get("/time_series", params=params)
@@ -100,12 +110,18 @@ class TwelveDataAdapter:
             raise _RetryableError(f"HTTP {response.status_code}")
         if response.status_code >= 400:
             raise AdapterError(f"twelvedata HTTP {response.status_code}")
-        data: dict[str, object] = response.json()
+        try:
+            data: dict[str, object] = response.json()
+        except ValueError:
+            raise AdapterError("twelvedata: response was not JSON") from None
         # Twelve Data reports most errors inside a 200 response.
         if data.get("status") == "error":
-            if data.get("code") == 429:
+            code = data.get("code")
+            if code == 429:
                 raise _RetryableError("rate limited")
-            raise AdapterError(f"twelvedata error code {data.get('code')}")
+            if code == 400 and "no data" in str(data.get("message", "")).lower():
+                return {"values": []}  # nothing new yet (weekend, or the bar is not out)
+            raise AdapterError(f"twelvedata error code {code}")
         return data
 
     @staticmethod
@@ -116,19 +132,22 @@ class TwelveDataAdapter:
         now = datetime.now(UTC)
         candles: list[RawCandle] = []
         for row in values:
-            opened = _parse_time(row["datetime"])
-            if (now - opened).total_seconds() < timeframe.seconds:
-                continue  # still forming
-            candles.append(
-                RawCandle(
-                    ts=opened,
-                    open=Decimal(row["open"]),
-                    high=Decimal(row["high"]),
-                    low=Decimal(row["low"]),
-                    close=Decimal(row["close"]),
-                    volume=Decimal(row.get("volume") or 0),
+            try:
+                opened = _parse_time(row["datetime"])
+                if (now - opened).total_seconds() < timeframe.seconds:
+                    continue  # still forming
+                candles.append(
+                    RawCandle(
+                        ts=opened,
+                        open=Decimal(row["open"]),
+                        high=Decimal(row["high"]),
+                        low=Decimal(row["low"]),
+                        close=Decimal(row["close"]),
+                        volume=Decimal(row.get("volume") or 0),
+                    )
                 )
-            )
+            except (KeyError, TypeError, ValueError, ArithmeticError):
+                raise AdapterError(f"{label}: malformed candle row") from None
         return sorted(candles, key=lambda candle: candle.ts)
 
     async def aclose(self) -> None:

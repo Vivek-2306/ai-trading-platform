@@ -24,7 +24,9 @@ KEY = SecretStr("test-key-123")
 
 def _adapter(handler: httpx.MockTransport | None, attempts: int = 3) -> TwelveDataAdapter:
     client = httpx.AsyncClient(base_url="https://api.twelvedata.com", transport=handler)
-    return TwelveDataAdapter(KEY, client, attempts=attempts, max_wait_seconds=0.01)
+    return TwelveDataAdapter(
+        KEY, client, attempts=attempts, max_wait_seconds=0.01, min_interval_seconds=0
+    )
 
 
 def _ok(request: httpx.Request) -> httpx.Response:
@@ -138,3 +140,47 @@ async def test_aclose_closes_the_client() -> None:
     await adapter.aclose()
 
     assert adapter._client.is_closed
+
+
+async def test_no_data_for_the_range_is_an_empty_result_not_an_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = {
+            "code": 400,
+            "message": "No data is available on the specified dates",
+            "status": "error",
+        }
+        return httpx.Response(200, json=body)
+
+    assert await _adapter(httpx.MockTransport(handler)).fetch_candles("XAU/USD", Timeframe.H1) == []
+
+
+async def test_malformed_rows_and_non_json_become_adapter_errors() -> None:
+    def bad_row(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"values": [{"datetime": "2026-01-05 10:00:00"}]})
+
+    def html(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html>oops</html>")
+
+    with pytest.raises(AdapterError, match="malformed"):
+        await _adapter(httpx.MockTransport(bad_row)).fetch_candles("XAU/USD", Timeframe.H1)
+    with pytest.raises(AdapterError, match="not JSON"):
+        await _adapter(httpx.MockTransport(html)).fetch_candles("XAU/USD", Timeframe.H1)
+
+
+async def test_calls_are_spaced_to_respect_the_free_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("app.data.adapters.twelvedata.asyncio.sleep", fake_sleep)
+    client = httpx.AsyncClient(
+        base_url="https://api.twelvedata.com", transport=httpx.MockTransport(_ok)
+    )
+    adapter = TwelveDataAdapter(KEY, client, min_interval_seconds=8)
+
+    await adapter.fetch_candles("XAU/USD", Timeframe.H1)
+    await adapter.fetch_candles("XAU/USD", Timeframe.H1)
+
+    assert len(sleeps) == 1
+    assert 0 < sleeps[0] <= 8
