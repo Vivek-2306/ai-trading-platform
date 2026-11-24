@@ -4,6 +4,67 @@
  */
 
 export interface paths {
+    "/data/candles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List candles
+         * @description The newest `limit` candles (oldest first). Page back in time with `next_before`.
+         */
+        get: operations["candles_data_candles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/data/instruments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List instruments
+         * @description Every instrument we hold candles for, ordered by venue and symbol.
+         */
+        get: operations["instruments_data_instruments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/data/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data-quality report
+         * @description Per instrument and timeframe, over the last 30 days: missing candles (market-hours
+         *     aware), stale data, candles whose open or close lies outside high-low, and price spikes.
+         */
+        get: operations["quality_data_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -65,6 +126,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * CandleOut
+         * @description Prices are decimal strings in JSON, so no precision is lost.
+         */
+        CandleOut: {
+            /** Close */
+            close: string;
+            /** High */
+            high: string;
+            /** Low */
+            low: string;
+            /** Open */
+            open: string;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Volume */
+            volume: string;
+        };
+        /** CandlesResponse */
+        CandlesResponse: {
+            /** Candles */
+            candles: components["schemas"]["CandleOut"][];
+            /** Instrument Id */
+            instrument_id: number;
+            /** Next Before */
+            next_before: string | null;
+            timeframe: components["schemas"]["Timeframe"];
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -72,6 +169,51 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /** InstrumentOut */
+        InstrumentOut: {
+            /** Active */
+            active: boolean;
+            /** Asset Class */
+            asset_class: string;
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Venue */
+            venue: string;
+        };
+        /** InstrumentQuality */
+        InstrumentQuality: {
+            /** Candles */
+            candles: number;
+            /** Gap Runs */
+            gap_runs: number;
+            /** Inconsistent Candles */
+            inconsistent_candles: number;
+            /** Latest */
+            latest: string | null;
+            /** Missing Candles */
+            missing_candles: number;
+            /** Ok */
+            ok: boolean;
+            /** Spikes */
+            spikes: number;
+            /** Stale */
+            stale: boolean;
+            /** Symbol */
+            symbol: string;
+            /** Timeframe */
+            timeframe: string;
+            /** Venue */
+            venue: string;
+        };
+        /** QualityResponse */
+        QualityResponse: {
+            /** Instruments */
+            instruments: components["schemas"]["InstrumentQuality"][];
+            /** Ok */
+            ok: boolean;
         };
         /** ReadinessResponse */
         ReadinessResponse: {
@@ -84,6 +226,25 @@ export interface components {
              * @enum {string}
              */
             status: "ready" | "not_ready";
+        };
+        /**
+         * Timeframe
+         * @description Candle sizes. The value is what is stored in the database.
+         * @enum {string}
+         */
+        Timeframe: "1m" | "5m" | "1h" | "1d";
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
         };
         /** VersionResponse */
         VersionResponse: {
@@ -105,6 +266,88 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    candles_data_candles_get: {
+        parameters: {
+            query: {
+                instrument_id: number;
+                timeframe: components["schemas"]["Timeframe"];
+                limit?: number;
+                /** @description Only candles opened before this time */
+                before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandlesResponse"];
+                };
+            };
+            /** @description Unknown instrument */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    instruments_data_instruments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentOut"][];
+                };
+            };
+        };
+    };
+    quality_data_quality_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityResponse"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;

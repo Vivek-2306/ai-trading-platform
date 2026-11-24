@@ -6,6 +6,17 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `instruments` and `candles` tables (candles is a TimescaleDB hypertable with exact `NUMERIC` prices, UTC times, one row per instrument, timeframe and open time) and migration `0002` (AITP-41).
+- Market data adapter interface and a Binance public-data adapter (`ccxt`, no API key): closed candles only, exact `Decimal` prices, retries with backoff on rate limits, reusable contract test. `ccxt` and `tenacity` are now runtime dependencies so the worker image has them (AITP-42).
+- Twelve Data adapter for XAU/USD gold, enabled by the optional `TWELVE_DATA_API_KEY`; gold defaults to `PAXG/USDT` on Binance without a key. The API key never appears in errors or logs (AITP-43).
+- Historical backfill: `backfill_candles` Celery task loads N years for an instrument and timeframe page by page, logs progress, and is safe to re-run (existing candles are skipped). Default instrument list in `app/data/universe.py` (AITP-44).
+- Hourly `update_candles` job (Celery beat, 2 minutes past the hour): fetches new candles for every tracked instrument, finds holes in the last 30 days and refills them. Market-hours aware: spot gold's weekend closure is not a gap, while crypto never closes. One failing instrument does not stop the rest (AITP-45).
+- `GET /data/quality`: per instrument and timeframe, missing candles, stale data, inconsistent candles and price spikes over the last 30 days, shown on the web status page. Postman collection and typed web client regenerated (AITP-46).
+- `GET /data/instruments` and `GET /data/candles` (newest-first paging with `before` / `next_before`, up to 1000 per page, prices as exact decimal strings) (AITP-47).
+- Web `/charts` page: candlestick chart (lightweight-charts) with instrument and 1h/1d pickers, dark/light aware, responsive with a bottom-nav entry on phones, loading, empty and error states. Checked in a phone-sized browser against real Binance data (AITP-48).
+
 ## [0.1.0] - 2026-11-24
 
 First release: the complete project setup. There are no trading features yet.

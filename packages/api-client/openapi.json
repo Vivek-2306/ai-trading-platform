@@ -1,6 +1,97 @@
 {
   "components": {
     "schemas": {
+      "CandleOut": {
+        "description": "Prices are decimal strings in JSON, so no precision is lost.",
+        "properties": {
+          "close": {
+            "title": "Close",
+            "type": "string"
+          },
+          "high": {
+            "title": "High",
+            "type": "string"
+          },
+          "low": {
+            "title": "Low",
+            "type": "string"
+          },
+          "open": {
+            "title": "Open",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "volume": {
+            "title": "Volume",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "CandleOut",
+        "type": "object"
+      },
+      "CandlesResponse": {
+        "properties": {
+          "candles": {
+            "items": {
+              "$ref": "#/components/schemas/CandleOut"
+            },
+            "title": "Candles",
+            "type": "array"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "integer"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before"
+          },
+          "timeframe": {
+            "$ref": "#/components/schemas/Timeframe"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "timeframe",
+          "candles",
+          "next_before"
+        ],
+        "title": "CandlesResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -13,6 +104,131 @@
           "status"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "InstrumentOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "asset_class": {
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "venue": {
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "venue",
+          "symbol",
+          "asset_class",
+          "active"
+        ],
+        "title": "InstrumentOut",
+        "type": "object"
+      },
+      "InstrumentQuality": {
+        "properties": {
+          "candles": {
+            "title": "Candles",
+            "type": "integer"
+          },
+          "gap_runs": {
+            "title": "Gap Runs",
+            "type": "integer"
+          },
+          "inconsistent_candles": {
+            "title": "Inconsistent Candles",
+            "type": "integer"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "missing_candles": {
+            "title": "Missing Candles",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "spikes": {
+            "title": "Spikes",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "venue": {
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue",
+          "symbol",
+          "timeframe",
+          "ok",
+          "candles",
+          "latest",
+          "missing_candles",
+          "gap_runs",
+          "stale",
+          "inconsistent_candles",
+          "spikes"
+        ],
+        "title": "InstrumentQuality",
+        "type": "object"
+      },
+      "QualityResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentQuality"
+            },
+            "title": "Instruments",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "instruments"
+        ],
+        "title": "QualityResponse",
         "type": "object"
       },
       "ReadinessResponse": {
@@ -42,6 +258,57 @@
           "checks"
         ],
         "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "Timeframe": {
+        "description": "Candle sizes. The value is what is stored in the database.",
+        "enum": [
+          "1m",
+          "5m",
+          "1h",
+          "1d"
+        ],
+        "title": "Timeframe",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
         "type": "object"
       },
       "VersionResponse": {
@@ -87,6 +354,140 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/data/candles": {
+      "get": {
+        "description": "The newest `limit` candles (oldest first). Page back in time with `next_before`.",
+        "operationId": "candles_data_candles_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "instrument_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Instrument Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeframe",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Timeframe"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only candles opened before this time",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only candles opened before this time",
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandlesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown instrument"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List candles",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/data/instruments": {
+      "get": {
+        "description": "Every instrument we hold candles for, ordered by venue and symbol.",
+        "operationId": "instruments_data_instruments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/InstrumentOut"
+                  },
+                  "title": "Response Instruments Data Instruments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List instruments",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/data/quality": {
+      "get": {
+        "description": "Per instrument and timeframe, over the last 30 days: missing candles (market-hours\naware), stale data, candles whose open or close lies outside high-low, and price spikes.",
+        "operationId": "quality_data_quality_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Data-quality report",
+        "tags": [
+          "data"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "Returns ok while the process is up. It does not check dependencies; see /health/ready.",

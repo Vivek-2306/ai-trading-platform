@@ -46,3 +46,89 @@ export async function getSystemStatus(): Promise<SystemStatus> {
     return { api: "down" };
   }
 }
+
+export type DataQuality = {
+  ok: boolean;
+  instruments: {
+    venue: string;
+    symbol: string;
+    timeframe: string;
+    ok: boolean;
+    candles: number;
+    latest: string | null;
+    missing_candles: number;
+    stale: boolean;
+    inconsistent_candles: number;
+    spikes: number;
+  }[];
+};
+
+/** Market-data quality report, or null if the API or database cannot answer. */
+export async function getDataQuality(): Promise<DataQuality | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/quality", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    return data ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "data_quality_unavailable");
+    return null;
+  }
+}
+
+export type MarketInstrument = {
+  id: number;
+  venue: string;
+  symbol: string;
+  asset_class: string;
+  active: boolean;
+};
+
+export type Candle = {
+  ts: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+};
+
+/** Instruments we hold candles for, or null if the API cannot answer. */
+export async function getInstruments(): Promise<MarketInstrument[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/instruments", {
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(6000),
+    });
+    return data ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "instruments_unavailable");
+    return null;
+  }
+}
+
+/** The newest candles (oldest first), or null if the API cannot answer. */
+export async function getCandles(
+  instrumentId: number,
+  timeframe: "1m" | "5m" | "1h" | "1d",
+  limit = 500,
+): Promise<Candle[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/data/candles", {
+      params: { query: { instrument_id: instrumentId, timeframe, limit } },
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    return data?.candles ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "candles_unavailable");
+    return null;
+  }
+}

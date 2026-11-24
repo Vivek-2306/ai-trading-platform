@@ -62,3 +62,14 @@ def test_url_with_percent_encoded_password_works(
         get_settings.cache_clear()
 
     assert "CREATE EXTENSION IF NOT EXISTS vector" in capsys.readouterr().out
+
+
+def test_market_tables_migration_creates_hypertable(
+    alembic_config: Config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    command.upgrade(alembic_config, "0001:0002", sql=True)
+
+    sql = capsys.readouterr().out
+    assert "CREATE TABLE instruments" in sql
+    assert "CREATE TABLE candles" in sql
+    assert "create_hypertable('candles', 'ts'" in sql

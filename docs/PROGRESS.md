@@ -4,8 +4,10 @@
 
 ## Current phase
 
-**v0.1.0 released 2026-11-24** (setup phases 1–6, PRs #1–#6, #12–#14). Feature phases 7 to 9b are
-planned in `docs/PLAN.md` (ADR 0003); none started. See `docs/SETUP_REPORT.md`.
+**Phase 7 — Crypto and gold market data** on `phase-7-market-data` (AITP-41 … 48). v0.1.0 released
+2026-11-24. Later feature phases (7b, 8a, 8b, 9, 9b, 10 to 12) are planned in `docs/PLAN.md` (ADR 0003).
+Tickets: 41 candle tables, 42 exchange adapter + Binance, 43 gold source spike + adapter, 44 backfill job,
+45 incremental updates + gap refill, 46 data-quality checks, 47 API endpoints, 48 web price chart.
 
 ## Last completed
 
@@ -57,14 +59,16 @@ planned in `docs/PLAN.md` (ADR 0003); none started. See `docs/SETUP_REPORT.md`.
 
 - Phase 5 merged (PR #6). Phase 6: AITP-30 pre-commit hooks (`pnpm hooks:install`), AITP-31 gitleaks in CI (full history clean), AITP-32 production Compose (web, API, worker, beat, db, redis, Caddy; verified locally, only Caddy exposed), AITP-33 quickstart verified from a fresh clone (`pnpm bootstrap`, `pnpm check`), AITP-34 branch protection script (4 required checks; `main` not strict so release PRs cannot deadlock), AITP-35 setup report + CHANGELOG 0.1.0.
 
+- Phase 7 (crypto and gold market data): AITP-41 candle tables (hypertable, NUMERIC, UTC), AITP-42 Binance adapter via ccxt, AITP-43 gold: PAXG/USDT default plus optional Twelve Data XAU/USD, AITP-44 backfill job, AITP-45 hourly update + market-hours-aware gap refill, AITP-46 data-quality checks + `/data/quality` + status page card, AITP-47 `/data/instruments` and `/data/candles`, AITP-48 web `/charts`. Verified live with real Binance data (BTC, ETH, PAXG all healthy). Review fixes: Twelve Data "no data" handling, throttling, NY-time market hours, key never in errors.
+
 ## In progress
 
-Feature planning PR (phases 7 to 9b, ADR 0003) awaiting owner review.
+Phase 7 PR into `develop` (owner review).
 
 ## Next up
 
-1. Owner reviews and merges the planning PR.
-2. Owner says "go" for Phase 7 (`/start-phase 7`): crypto and gold market data.
+1. Owner reviews and merges the Phase 7 PR; then `/release-phase 7`.
+2. Owner says "go" for Phase 7b (live streaming, `/start-phase 7b`).
 3. Owner: add to `.env.example` (Claude cannot edit it): `API_URL`, `POSTGRES_PORT`, `REDIS_PORT`, `LOG_FILE`, `SENTRY_DSN`, `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`; later the gold data API key.
 4. Owner decision: narrow the over-broad `Bash(* .env.*)` deny rule.
 5. Review Dependabot PRs #7 to #10; do not merge #11 (TypeScript 7 breaks the API client generator).
@@ -81,6 +85,11 @@ Feature order: 7 data → 7b live stream → 8a signals → 8b risk → 9 backte
 - [x] Mobile app: after the web app.
 
 ## Known issues
+
+- Phase 7 limitations (deliberate, to revisit): exchange holidays for spot gold (Dec 25, Jan 1) show as
+  candle gaps and are re-fetched hourly; the chart shows only the newest 500 candles (no scroll-back yet);
+  `/data/quality` is uncached; the Twelve Data adapter has never been called live (needs a free key, then
+  check that an old `start_date` with `order=ASC` returns the oldest rows).
 
 - Old dev volume `aitp_db-data` (from the previous timescaledb-ha image) is unused; the owner
   can delete it with `docker volume rm aitp_db-data` (it only held an empty dev database).

@@ -8,6 +8,7 @@ Run from apps/api (needs Redis: `pnpm infra:up`):
 from typing import Any
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import setup_logging
 
 from app.core.config import Settings, get_settings
@@ -46,6 +47,11 @@ def create_celery(settings: Settings) -> Celery:
             "heartbeat": {
                 "task": "app.worker.tasks.heartbeat",
                 "schedule": settings.heartbeat_interval_seconds,
+            },
+            # Two minutes past each hour, once the exchange has published the closed candle.
+            "update-candles": {
+                "task": "app.worker.tasks.update_candles",
+                "schedule": crontab(minute=2),
             },
         },
     )
