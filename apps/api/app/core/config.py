@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     heartbeat_interval_seconds: float = Field(default=60, ge=5)
     # Longer than the longest background task (6 h default); see celery_app.py.
     task_visibility_timeout_seconds: int = Field(default=6 * 3600, ge=60)
+    # AI. Keys are optional until a feature needs them; SecretStr keeps them out of logs and reprs.
+    anthropic_api_key: SecretStr | None = None
+    voyage_api_key: SecretStr | None = None
+    ai_model_bulk: str = "claude-haiku-5-5"  # cheap, high-volume work such as news tagging
+    ai_model_reasoning: str = "claude-opus-5-5"  # final reasoning on a signal
     # Seconds a readiness check may wait for a dependency before calling it unavailable.
     dependency_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
 

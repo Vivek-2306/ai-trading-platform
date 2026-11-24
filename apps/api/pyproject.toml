@@ -24,6 +24,11 @@ dependencies = [
 package = false
 
 [dependency-groups]
+ai = [
+    "anthropic>=2.13.0",
+    "pgvector>=0.5.1",
+    "voyageai>=0.6.0",
+]
 analysis = [
     "exchange-calendars>=4.13.3",
     "numpy>=2.5.5",
@@ -44,6 +49,19 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.17.6",
     "testcontainers[postgres,redis]>=4.15.0",
+]
+markets = [
+    "alpaca-py>=0.45.0",
+    "ccxt>=4.5.94",
+    "feedparser>=6.0.14",
+    "finnhub-python>=2.4.30",
+    "fredapi>=0.5.2",
+    "kiteconnect>=5.2.2",
+    "polygon-api-client>=0.2.11",
+    "python-telegram-bot>=22.8",
+    "tenacity>=9.2.1",
+    "trafilatura>=2.1.0",
+    "websockets>=17.4",
 ]
 ml = [
     "lightgbm>=4.7.0",

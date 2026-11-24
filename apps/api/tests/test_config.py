@@ -73,3 +73,14 @@ def test_rejects_wildcard_cors_origin(monkeypatch: pytest.MonkeyPatch, origins: 
 
     with pytest.raises(ValidationError, match="not allowed"):
         Settings(_env_file=None)
+
+
+def test_ai_settings_defaults_and_secrets_are_hidden() -> None:
+    settings = Settings(_env_file=None, anthropic_api_key="sk-ant-secret")
+
+    assert settings.ai_model_bulk == "claude-haiku-5-5"
+    assert settings.ai_model_reasoning == "claude-opus-5-5"
+    assert settings.voyage_api_key is None
+    assert "sk-ant-secret" not in repr(settings)
+    assert settings.anthropic_api_key is not None
+    assert settings.anthropic_api_key.get_secret_value() == "sk-ant-secret"
