@@ -21,6 +21,7 @@ from app.core.error_reporting import init_error_reporting
 from app.core.logging import configure_logging
 from app.core.readiness import register_check
 from app.core.redis import check_redis, create_redis
+from app.risk.limits import get_risk_limits
 
 
 @asynccontextmanager
@@ -52,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
     init_error_reporting(settings)
+    get_risk_limits()  # fail at startup, not at the first signal, if a limit is unsafe
 
     app = FastAPI(
         title="AI Trading Platform API",
