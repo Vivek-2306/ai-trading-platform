@@ -19,7 +19,11 @@ D = Decimal
 
 class RiskLimits(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="RISK_", env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore"
+        env_prefix="RISK_",
+        env_file=ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+        frozen=True,  # limits cannot be changed after they were validated
     )
 
     # Money you are willing to put at work, in the quote currency (USDT). A placeholder: set
@@ -46,6 +50,13 @@ class RiskLimits(BaseSettings):
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
         return None if value == "" else value
+
+    @field_validator("admin_token")
+    @classmethod
+    def _strong_token(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is not None and len(value.get_secret_value().strip()) < 16:
+            raise ValueError("RISK_ADMIN_TOKEN must be at least 16 characters (not blank)")
+        return value
 
     @field_validator(
         "capital",

@@ -108,4 +108,5 @@ def test_signal_risk_record_is_mapped_for_a_fresh_actionable_buy() -> None:
     assert buy.actionable and buy.risk.plan and buy.risk.plan.stop == Decimal("97")
     assert not legacy.actionable and not legacy.risk.assessed  # older than the risk engine
     assert not vetoed.actionable and vetoed.risk.plan is None  # no plan for a refused BUY
+    assert not vetoed.risk.portfolio_tracked
     assert vetoed.risk.rules_action == "BUY" and vetoed.risk.vetoes[0].code == "max_open_positions"

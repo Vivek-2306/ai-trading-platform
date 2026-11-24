@@ -7,6 +7,13 @@ Create Date: 2026-11-24
 `risk` holds the veto layer's record (plan, size, vetoes, limits). Older rows get `{}`: they
 predate the risk engine and are shown as not risk-assessed. New rows are stored with
 `risk.assessed = true`. A BUY row must have a plan and a size, or the database refuses it.
+
+The conditions are wrapped in COALESCE on purpose: a CHECK passes when its result is NULL, and
+`jsonb_typeof(NULL)` is NULL, which would let a BUY with no plan through.
+
+The rule is added NOT VALID: it is enforced for every new row, but does not re-check old rows
+(signals are append-only, so an old BUY without a plan could never be fixed, and the migration
+would otherwise fail on any database that already produced one).
 """
 
 from collections.abc import Sequence
@@ -31,10 +38,12 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_check_constraint(
-        "buy_has_plan",
-        "signals",
-        "action <> 'BUY' OR (risk ? 'plan' AND risk ? 'size' AND risk ->> 'assessed' = 'true')",
+    op.execute(
+        "ALTER TABLE signals ADD CONSTRAINT ck_signals_buy_has_plan CHECK ("
+        "action <> 'BUY' OR ("
+        "COALESCE(jsonb_typeof(risk -> 'plan') = 'object', false) "
+        "AND COALESCE(jsonb_typeof(risk -> 'size') = 'object', false) "
+        "AND COALESCE(risk ->> 'assessed' = 'true', false))) NOT VALID"
     )
 
 

@@ -59,6 +59,9 @@ class RiskAssessment:
         """The JSON stored with the signal. A BUY always carries `plan` and `size`."""
         record: dict[str, Any] = {
             "assessed": True,
+            # False until paper trading exists: the open-position and daily-loss limits have no
+            # real inputs yet, so they cannot trigger.
+            "portfolio_tracked": False,
             "rules_action": self.rules_action.value,
             "kill_switch": self.kill_switch,
             "vetoes": [{"code": v.code, "text": v.text} for v in self.vetoes],
@@ -67,19 +70,19 @@ class RiskAssessment:
         if self.plan is not None:
             record["plan"] = {
                 "side": self.plan.side,
-                "entry": str(self.plan.entry),
-                "stop": str(self.plan.stop),
-                "target": str(self.plan.target),
-                "risk_per_unit": str(self.plan.risk_per_unit),
-                "reward_per_unit": str(self.plan.reward_per_unit),
-                "risk_reward": str(self.plan.risk_reward),
+                "entry": format(self.plan.entry, "f"),
+                "stop": format(self.plan.stop, "f"),
+                "target": format(self.plan.target, "f"),
+                "risk_per_unit": format(self.plan.risk_per_unit, "f"),
+                "reward_per_unit": format(self.plan.reward_per_unit, "f"),
+                "risk_reward": format(self.plan.risk_reward, "f"),
             }
         if self.size is not None:
             record["size"] = {
-                "quantity": str(self.size.quantity),
-                "notional": str(self.size.notional),
-                "risk_amount": str(self.size.risk_amount),
-                "capital_share_pct": str(self.size.capital_share_pct),
+                "quantity": format(self.size.quantity, "f"),
+                "notional": format(self.size.notional, "f"),
+                "risk_amount": format(self.size.risk_amount, "f"),
+                "capital_share_pct": format(self.size.capital_share_pct, "f"),
                 "limited_by": self.size.limited_by,
             }
         return record

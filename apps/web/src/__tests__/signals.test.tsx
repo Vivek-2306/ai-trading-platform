@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ActionBadge, formatCandleTime, SignalCard } from "@/components/signal-card";
+import { ActionBadge, formatCandleTime, money, SignalCard } from "@/components/signal-card";
 import { getLatestSignals, getRecentSignals, type Signal } from "@/lib/api";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ "x-request-id": "req-1" }) }));
@@ -213,5 +213,16 @@ describe("risk display", () => {
   it("never shows a plan on a stale signal", () => {
     render(<SignalCard signal={signal({ stale: true, risk: risk() })} />);
     expect(screen.queryByLabelText("Risk plan")).not.toBeInTheDocument();
+  });
+});
+
+describe("money", () => {
+  it("formats exact decimal strings without going through a float", () => {
+    expect(money("97000.123456785")).toBe("97,000.123456785"); // a float would round this
+    expect(money("60000.50000000")).toBe("60,000.5");
+    expect(money("1234567")).toBe("1,234,567");
+    expect(money("0.00005")).toBe("0.00005");
+    expect(money("-1500.5")).toBe("-1,500.5");
+    expect(money("100.00000000")).toBe("100");
   });
 });

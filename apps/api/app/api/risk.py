@@ -83,8 +83,7 @@ async def status(session: SessionDep) -> RiskStatus:
     "/kill-switch",
     summary="Switch the kill switch on or off",
     responses={
-        401: {"description": "Wrong or missing admin token (switching off)"},
-        403: {"description": "Switching off through the API is disabled (no token configured)"},
+        401: {"description": "Switching off needs the admin token (or use the command line)"},
     },
 )
 async def change_kill_switch(
@@ -95,14 +94,12 @@ async def change_kill_switch(
     """ON needs nothing. OFF needs the admin token."""
     if not body.active:
         token = get_risk_limits().admin_token
-        if token is None:
-            raise HTTPException(
-                status_code=403,
-                detail="Switching off through the API is disabled; use the command line.",
-            )
         supplied = (x_admin_token or "").encode()
-        if not hmac.compare_digest(supplied, token.get_secret_value().encode()):
-            raise HTTPException(status_code=401, detail="Wrong or missing admin token.")
+        # The same answer whether no token is configured or the guess is wrong, so a caller
+        # learns nothing about the setup. Without a token, use the command line.
+        expected = token.get_secret_value().encode() if token else b""
+        if token is None or not hmac.compare_digest(supplied, expected):
+            raise HTTPException(status_code=401, detail="Not allowed. Use the command line.")
     state, _ = await set_kill_switch(session, active=body.active, actor="api", reason=body.reason)
     return KillSwitchOut(
         active=state.active, since=state.since, actor=state.actor, reason=state.reason

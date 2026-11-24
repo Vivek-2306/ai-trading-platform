@@ -433,6 +433,11 @@ export interface components {
              */
             kill_switch: boolean;
             plan?: components["schemas"]["PlanOut"] | null;
+            /**
+             * Portfolio Tracked
+             * @default false
+             */
+            portfolio_tracked: boolean;
             rules_action?: components["schemas"]["SignalAction"] | null;
             size?: components["schemas"]["SizeOut"] | null;
             /**
@@ -487,6 +492,7 @@ export interface components {
              * @default {
              *       "assessed": false,
              *       "kill_switch": false,
+             *       "portfolio_tracked": false,
              *       "vetoes": []
              *     }
              */
@@ -772,15 +778,8 @@ export interface operations {
                     "application/json": components["schemas"]["KillSwitchOut"];
                 };
             };
-            /** @description Wrong or missing admin token (switching off) */
+            /** @description Switching off needs the admin token (or use the command line) */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Switching off through the API is disabled (no token configured) */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

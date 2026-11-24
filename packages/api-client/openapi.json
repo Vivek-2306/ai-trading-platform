@@ -504,6 +504,11 @@
               }
             ]
           },
+          "portfolio_tracked": {
+            "default": false,
+            "title": "Portfolio Tracked",
+            "type": "boolean"
+          },
           "rules_action": {
             "anyOf": [
               {
@@ -619,6 +624,7 @@
             "default": {
               "assessed": false,
               "kill_switch": false,
+              "portfolio_tracked": false,
               "vetoes": []
             }
           },
@@ -1113,10 +1119,7 @@
             "description": "Successful Response"
           },
           "401": {
-            "description": "Wrong or missing admin token (switching off)"
-          },
-          "403": {
-            "description": "Switching off through the API is disabled (no token configured)"
+            "description": "Switching off needs the admin token (or use the command line)"
           },
           "422": {
             "content": {

@@ -78,10 +78,10 @@ def to_signal(
             {
                 "code": "risk_plan",
                 "text": (
-                    f"Plan: buy near {assessment.plan.entry}, stop {assessment.plan.stop}, "
-                    f"target {assessment.plan.target}, size {assessment.size.quantity} "
-                    f"(risking {assessment.size.risk_amount}, risk-to-reward "
-                    f"{assessment.plan.risk_reward})."
+                    f"Plan: buy near {assessment.plan.entry:f}, stop {assessment.plan.stop:f}, "
+                    f"target {assessment.plan.target:f}, size {assessment.size.quantity:f} "
+                    f"(risking {assessment.size.risk_amount:f}, risk-to-reward "
+                    f"{assessment.plan.risk_reward:f})."
                 ),
                 "direction": "info",
                 "weight": 0.0,

@@ -1314,21 +1314,22 @@ def test_kill_switch_api_on_is_open_off_needs_the_token(
     with TestClient(create_app(settings)) as client:
         assert post(client, True) == 200  # switching ON needs nothing
         assert client.get("/risk/status").json()["kill_switch"]["active"] is True
-        assert post(client, False) == 403  # no token configured: OFF only from the command line
-        assert post(client, False, "guess") == 403
+        # No token configured: OFF only from the command line. Same answer as a wrong token.
+        assert post(client, False) == 401
+        assert post(client, False, "guess") == 401
 
-    monkeypatch.setenv("RISK_ADMIN_TOKEN", "open-sesame")
+    monkeypatch.setenv("RISK_ADMIN_TOKEN", "open-sesame-0123456789")
     get_risk_limits.cache_clear()
     try:
         with TestClient(create_app(settings)) as client:
             assert post(client, False) == 401  # token configured, none sent
             assert post(client, False, "wrong") == 401
             assert client.get("/risk/status").json()["kill_switch"]["active"] is True
-            assert post(client, False, "open-sesame") == 200
+            assert post(client, False, "open-sesame-0123456789") == 200
             status = client.get("/risk/status").json()
             assert status["kill_switch"]["active"] is False
             assert status["limits"]["risk_per_trade_pct"] == "0.5"
-            assert "admin_token" not in str(status) and "open-sesame" not in str(status)
+            assert "admin_token" not in str(status) and "open-sesame-0123456789" not in str(status)
             assert [e["active"] for e in status["recent_events"][:2]] == [False, True]
     finally:
         monkeypatch.delenv("RISK_ADMIN_TOKEN")
@@ -1465,3 +1466,115 @@ def test_the_runner_stores_the_post_veto_action_and_the_database_refuses_a_bare_
     assert (killed_action, kill_flag, rules_action) == ("NO_TRADE", True, "BUY")
     assert "risk_kill_switch" in killed_codes
     assert out["bare_buy"] == "refused"
+
+
+def test_signals_api_reads_the_kill_switch_live_and_a_legacy_buy_does_not_block_the_migration(
+    postgres_url: str, redis_url: str
+) -> None:
+    from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import create_async_engine as make_engine
+
+    from app.core.config import Settings
+    from app.data.models import AssetClass, Signal
+    from app.data.repository import get_or_create_instrument, record_signal
+    from app.data.universe import InstrumentSpec
+    from app.main import create_app
+    from app.risk.killswitch import set_kill_switch
+
+    _migrate(postgres_url)
+    now = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
+
+    async def seed(session: AsyncSession) -> int:
+        iid = (
+            await get_or_create_instrument(
+                session, InstrumentSpec("binance", "LIVEKS/USDT", AssetClass.CRYPTO)
+            )
+        ).id
+        await session.commit()
+        await record_signal(
+            session,
+            Signal(
+                instrument_id=iid,
+                timeframe="1h",
+                candle_ts=now - timedelta(hours=1),
+                action="BUY",
+                confidence=Decimal("0.8"),
+                reasons=[],
+                inputs={},
+                rule_version="rules-v2",
+                risk=_risk("BUY"),
+            ),
+        )
+        await set_kill_switch(session, active=False, actor="test", reason="reset for this test")
+        return iid
+
+    iid = _run(postgres_url, seed)
+    settings = Settings(
+        _env_file=None, app_env="test", database_url=postgres_url, redis_url=redis_url
+    )
+
+    def fetch(client: TestClient) -> dict[str, object]:
+        rows = client.get("/signals", params={"instrument_id": iid}).json()["signals"]
+        return rows[0]  # type: ignore[no-any-return]
+
+    with TestClient(create_app(settings)) as client:
+        before = fetch(client)
+
+        async def turn_on(session: AsyncSession) -> None:
+            await set_kill_switch(session, active=True, actor="test", reason="live check")
+
+        _run(postgres_url, turn_on)
+        during = fetch(client)
+
+        async def turn_off(session: AsyncSession) -> None:
+            await set_kill_switch(session, active=False, actor="test", reason="live check done")
+
+        _run(postgres_url, turn_off)
+
+    assert before["actionable"] is True and before["risk"]["plan"]["stop"] == "97"  # type: ignore[index]
+    assert before["risk"]["portfolio_tracked"] is False  # type: ignore[index]
+    # Switched on AFTER the BUY was stored: it must stop being actionable and lose its plan.
+    assert during["actionable"] is False
+    assert during["risk"]["plan"] is None and during["risk"]["size"] is None  # type: ignore[index]
+    assert during["risk"]["kill_switch"] is True  # type: ignore[index]
+
+    # A database that already holds a BUY from before the risk engine can still be migrated.
+    async def legacy() -> str:
+        engine = make_engine(postgres_url, isolation_level="AUTOCOMMIT")
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("DROP DATABASE IF EXISTS legacy_mig"))
+                await conn.execute(text("CREATE DATABASE legacy_mig"))
+        finally:
+            await engine.dispose()
+        return postgres_url.rsplit("/", 1)[0] + "/legacy_mig"
+
+    legacy_url = asyncio.run(legacy())
+    config = Config(str(ALEMBIC_INI))
+    config.attributes["configure_logger"] = False
+    config.set_main_option("sqlalchemy.url", legacy_url)
+    command.upgrade(config, "0005")
+
+    async def old_buy_then_migrate() -> str:
+        engine = make_engine(legacy_url)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        "INSERT INTO instruments (venue, symbol, asset_class) "
+                        "VALUES ('binance', 'OLD/USDT', 'crypto')"
+                    )
+                )
+                await conn.execute(
+                    text(
+                        "INSERT INTO signals (instrument_id, timeframe, candle_ts, action, "
+                        "confidence, reasons, inputs, rule_version) SELECT id, '1h', now(), "
+                        "'BUY', 0.9, '[]'::jsonb, '{}'::jsonb, 'rules-v1' FROM instruments"
+                    )
+                )
+        finally:
+            await engine.dispose()
+        return "inserted"
+
+    assert asyncio.run(old_buy_then_migrate()) == "inserted"
+    command.upgrade(config, "head")  # must not fail on the old BUY

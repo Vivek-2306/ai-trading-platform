@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from app.core.database import SessionDep
 from app.data.models import Instrument, Signal, SignalAction, Timeframe
+from app.risk.killswitch import kill_switch_state
 from app.signals.runner import STALE_AFTER_CANDLES
 
 router = APIRouter(prefix="/signals", tags=["signals"])
@@ -51,6 +52,9 @@ class RiskOut(BaseModel):
 
     # False for signals from before the risk engine existed: treat them as not actionable.
     assessed: bool = False
+    # False until paper trading exists: the open-position and daily-loss limits are not enforced
+    # yet because there is no position data to check against.
+    portfolio_tracked: bool = False
     # What the rule engine said before the risk veto (a refused BUY reads BUY here and
     # NO_TRADE in `action`).
     rules_action: SignalAction | None = None
@@ -87,7 +91,12 @@ class SignalsResponse(BaseModel):
     next_before_id: int | None
 
 
-def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) -> SignalOut:
+def _out(
+    signal: Signal,
+    instrument: Instrument,
+    now: datetime | None = None,
+    kill_switch_on: bool = False,
+) -> SignalOut:
     now = now or datetime.now(UTC)
     seconds = Timeframe(signal.timeframe).seconds
     record = signal.risk or {}
@@ -95,11 +104,20 @@ def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) ->
     is_stale = (now - signal.candle_ts).total_seconds() > seconds * STALE_AFTER_CANDLES
     assessed = record.get("assessed") is True
     show_plan = assessed and action is SignalAction.BUY
+    # The kill switch is read when serving, not only when the signal was made: a BUY stored
+    # before the switch was turned on must not stay actionable.
+    show_plan = show_plan and not kill_switch_on
+    vetoes = [VetoOut(**v) for v in record.get("vetoes", [])]
+    if kill_switch_on and not any(v.code == "kill_switch" for v in vetoes):
+        vetoes.append(
+            VetoOut(code="kill_switch", text="The kill switch is on: nothing is actionable.")
+        )
     risk = RiskOut(
         assessed=assessed,
+        portfolio_tracked=bool(record.get("portfolio_tracked", False)),
         rules_action=record.get("rules_action"),
-        kill_switch=bool(record.get("kill_switch", False)),
-        vetoes=[VetoOut(**v) for v in record.get("vetoes", [])],
+        kill_switch=kill_switch_on or bool(record.get("kill_switch", False)),
+        vetoes=vetoes,
         plan=PlanOut(**record["plan"]) if show_plan and "plan" in record else None,
         size=SizeOut(**record["size"]) if show_plan and "size" in record else None,
     )
@@ -117,7 +135,10 @@ def _out(signal: Signal, instrument: Instrument, now: datetime | None = None) ->
         rule_version=signal.rule_version,
         created_at=signal.created_at,
         risk=risk,
-        actionable=assessed and not is_stale and action in (SignalAction.BUY, SignalAction.SELL),
+        actionable=assessed
+        and not is_stale
+        and not kill_switch_on
+        and action in (SignalAction.BUY, SignalAction.SELL),
         stale=is_stale,
     )
 
@@ -148,7 +169,8 @@ async def list_signals(
     if before_id is not None:
         statement = statement.where(Signal.id < before_id)
     rows = (await session.execute(statement)).all()
-    items = [_out(signal, instrument) for signal, instrument in rows]
+    switch_on = (await kill_switch_state(session)).active
+    items = [_out(signal, instrument, kill_switch_on=switch_on) for signal, instrument in rows]
     return SignalsResponse(
         signals=items, next_before_id=items[-1].id if len(items) == limit else None
     )
@@ -174,4 +196,5 @@ async def latest_signals(session: SessionDep) -> list[SignalOut]:
             .order_by(Instrument.venue, Instrument.symbol, Signal.timeframe)
         )
     ).all()
-    return [_out(signal, instrument) for signal, instrument in rows]
+    switch_on = (await kill_switch_state(session)).active
+    return [_out(signal, instrument, kill_switch_on=switch_on) for signal, instrument in rows]

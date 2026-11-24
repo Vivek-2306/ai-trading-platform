@@ -133,6 +133,8 @@ def test_the_record_is_json_with_exact_decimal_strings() -> None:
     assert json.loads(json.dumps(record)) == record
     assert record["assessed"] is True and record["rules_action"] == "BUY"
     assert record["plan"]["stop"] == "97.00000000" or record["plan"]["stop"] == "97"
+    assert record["portfolio_tracked"] is False  # open-position and daily-loss inputs are stubs
+    assert "E" not in "".join(record["plan"].values())  # no scientific notation in the record
     assert record["size"]["limited_by"] == "risk"
     assert "admin_token" not in record["limits"]
     assert record["limits"]["risk_per_trade_pct"] == "0.5"
@@ -195,3 +197,12 @@ def test_a_buy_only_survives_with_a_plan_a_size_and_every_limit_respected(
         assert a.plan.risk_reward >= lim.min_risk_reward
     if a.rules_action is SignalAction.BUY and a.action is not SignalAction.BUY:
         assert a.vetoes, "a refused BUY must say why"
+
+
+def test_tiny_prices_are_stored_without_scientific_notation() -> None:
+    a = run(entry=D("0.00005"), atr=0.000001, lim=limits(capital="1000"), symbol="X/USDT")
+
+    record = a.as_record()
+    if a.plan is not None:
+        assert "E" not in "".join(str(v) for v in record["plan"].values())
+        assert "E" not in "".join(str(v) for v in record["size"].values())

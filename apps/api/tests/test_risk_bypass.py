@@ -1,5 +1,8 @@
 """Nothing may store a signal without the risk veto. These tests fail if a new code path does.
 
+This is a tripwire against accidents (it cannot see every dynamic trick); the real controls
+are the database rule and `record_signal`.
+
 The rule: a `Signal` is built only by `to_signal` in the signal runner (which needs a
 RiskAssessment, and a RiskAssessment can only come from `assess`), and stored only by
 `record_signal`. The database also refuses a BUY without a plan (tested in the integration
@@ -37,7 +40,12 @@ def _python_files() -> list[tuple[str, ast.Module]]:
 def test_only_the_runner_and_repository_touch_the_signal_model() -> None:
     offenders = []
     for name, tree in _python_files():
-        used = any(isinstance(node, ast.Name) and node.id == "Signal" for node in ast.walk(tree))
+        used = any(
+            (isinstance(node, ast.Name) and node.id == "Signal")
+            or (isinstance(node, ast.Attribute) and node.attr == "Signal")  # models.Signal(...)
+            or (isinstance(node, ast.alias) and node.name == "Signal")  # import Signal as S
+            for node in ast.walk(tree)
+        )
         if used and name not in MAY_USE_SIGNAL:
             offenders.append(name)
 

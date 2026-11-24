@@ -145,6 +145,8 @@ export type SignalAction = "BUY" | "SELL" | "HOLD" | "NO_TRADE";
 export type SignalRisk = {
   /** False for signals from before the risk engine: not risk-assessed, do not act on them. */
   assessed: boolean;
+  /** False until paper trading exists: open-position and daily-loss limits are not enforced yet. */
+  portfolio_tracked?: boolean;
   /** What the rules said before the risk veto (a refused BUY reads BUY here). */
   rules_action: SignalAction | null;
   kill_switch: boolean;

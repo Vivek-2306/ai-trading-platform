@@ -62,10 +62,11 @@ export default async function Signals() {
             Every BUY is checked against these before it can be actionable. Risk per trade{" "}
             {risk.limits.risk_per_trade_pct}% of capital (
             {Number(risk.limits.capital).toLocaleString("en-US")} USDT), at most{" "}
-            {risk.limits.max_capital_share_pct}% of capital in one position, no new entries after
-            losing {risk.limits.max_daily_loss_pct}% in a day, at most{" "}
-            {risk.limits.max_open_positions} open positions, and at least{" "}
-            {risk.limits.min_risk_reward} of reward per 1 of risk.
+            {risk.limits.max_capital_share_pct}% of capital in one position, and at least{" "}
+            {risk.limits.min_risk_reward} of reward per 1 of risk. The open-position limit (
+            {risk.limits.max_open_positions}) and the daily-loss limit (
+            {risk.limits.max_daily_loss_pct}% of capital) are not enforced yet: they need paper
+            trading (Phase 12) to know what is open and what was lost.
           </p>
         </Card>
       )}

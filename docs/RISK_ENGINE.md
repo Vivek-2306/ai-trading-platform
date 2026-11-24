@@ -34,8 +34,10 @@ be vetoed) and a per-trade risk above the daily loss limit.
    capital-share cap, rounded down to the instrument's lot size. The real risk and exposure never
    exceed the limits.
 3. **Limits:** no new BUY when the open-position limit is reached or today's realised losses
-   reached the daily loss limit. (There are no paper trades yet, so these inputs are empty until
-   Phase 12; the checks are tested and live.)
+   reached the daily loss limit. **These two are not enforced yet:** there are no paper trades, so
+   the inputs are always zero (stored as `portfolio_tracked: false`, and the web page says so).
+   The checks are tested and switch on when Phase 12 supplies real positions and losses. Until
+   then each signal is sized as if all capital were free, so treat the sizes as per-trade only.
 4. **Veto:** anything refused becomes **NO TRADE** with every reason. SELL, HOLD and NO TRADE pass
    through unchanged. The stored signal keeps what the rules said (`rules_action`) next to the
    final action, the plan, the size, the vetoes and a snapshot of the limits.
@@ -46,7 +48,7 @@ be vetoed) and a per-trade risk above the daily loss limit.
   A `RiskAssessment` can only be created by `assess()`.
 - `record_signal` refuses a signal without an assessment, and a BUY without its plan and size.
 - The database refuses a BUY row without them too (`ck_signals_buy_has_plan`).
-- `tests/test_risk_bypass.py` fails if any other module touches the Signal model, calls
+- `tests/test_risk_bypass.py` is a tripwire (not proof): it fails if any other module touches the Signal model, calls
   `record_signal`, or writes to the signals table with raw SQL.
 
 ## Kill switch
@@ -62,8 +64,10 @@ uv run python -m app.risk.killswitch off --reason "checked, all clear"
 ```
 
 API: `GET /risk/status`, `POST /risk/kill-switch {"active": true, "reason": "..."}`. Switching ON
-needs nothing. Switching OFF needs `RISK_ADMIN_TOKEN` in the `X-Admin-Token` header, and is refused
-when no token is configured (then use the command line). The web proxy does not forward `/risk`.
+needs nothing. Switching OFF needs `RISK_ADMIN_TOKEN` (16+ characters) in the `X-Admin-Token`
+header; without a configured token, or with a wrong one, the answer is the same 401 (use the
+command line). The web proxy does not forward `/risk`. The signals API reads the kill switch
+when it serves, so a BUY stored before the switch went on stops being actionable at once.
 
 ## Not built yet
 

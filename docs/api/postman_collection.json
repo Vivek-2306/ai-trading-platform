@@ -190,7 +190,7 @@
               ],
               "variable": []
             },
-            "description": "Switch the kill switch on or off\n\nON needs nothing. OFF needs the admin token.\n\nDocumented responses: 200, 401, 403, 422"
+            "description": "Switch the kill switch on or off\n\nON needs nothing. OFF needs the admin token.\n\nDocumented responses: 200, 401, 422"
           }
         },
         {

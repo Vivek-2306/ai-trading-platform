@@ -53,8 +53,15 @@ export function formatCandleTime(iso: string): string {
   return `${time.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
-const money = (value: string) =>
-  Number(value).toLocaleString("en-US", { maximumFractionDigits: 8 });
+/** An exact decimal string for display: thousands separators, no trailing zeros, and never
+ * rounded through a float (a rounded stop could read less cautious than the stored one). */
+export function money(value: string): string {
+  const [whole = "", fraction = ""] = value.split(".");
+  const sign = whole.startsWith("-") ? "-" : "";
+  const digits = whole.replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const trimmed = fraction.replace(/0+$/, "");
+  return `${sign}${digits}${trimmed ? `.${trimmed}` : ""}`;
+}
 
 /** The risk engine's plan for a BUY: where to enter, stop, target, how much, and the risk. */
 export function RiskPlan({ signal }: { signal: Signal }) {

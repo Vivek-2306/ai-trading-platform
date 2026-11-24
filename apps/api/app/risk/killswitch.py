@@ -15,7 +15,7 @@ import getpass
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import get_settings
@@ -23,6 +23,8 @@ from app.core.logging import get_logger
 from app.data.models import KillSwitchEvent
 
 logger = get_logger(__name__)
+
+_LOCK_KEY = 7_311_001  # arbitrary constant: the kill switch's advisory lock
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,8 +53,11 @@ async def set_kill_switch(
     reason = reason.strip()
     if len(reason) < 3:
         raise ValueError("a reason (at least 3 characters) is required")
+    # One writer at a time: otherwise two changes that both read the old state can lose one.
+    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _LOCK_KEY})
     current = await kill_switch_state(session)
     if current.active == active:
+        await session.rollback()  # releases the lock
         return current, False
     session.add(KillSwitchEvent(active=active, actor=actor[:64], reason=reason[:500]))
     await session.commit()

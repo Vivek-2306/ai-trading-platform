@@ -41,7 +41,10 @@ class Signal(Base):
         CheckConstraint("confidence >= 0 AND confidence <= 1", name="confidence_in_range"),
         # A BUY must carry the risk engine's plan and size (see app.risk.veto).
         CheckConstraint(
-            "action <> 'BUY' OR (risk ? 'plan' AND risk ? 'size' AND risk ->> 'assessed' = 'true')",
+            "action <> 'BUY' OR ("
+            "COALESCE(jsonb_typeof(risk -> 'plan') = 'object', false) "
+            "AND COALESCE(jsonb_typeof(risk -> 'size') = 'object', false) "
+            "AND COALESCE(risk ->> 'assessed' = 'true', false))",
             name="buy_has_plan",
         ),
     )

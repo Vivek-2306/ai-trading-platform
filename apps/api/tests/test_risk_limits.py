@@ -75,11 +75,12 @@ def test_risk_per_trade_cannot_exceed_the_daily_loss_limit() -> None:
 
 
 def test_the_admin_token_never_shows_in_a_repr() -> None:
-    limits = make(admin_token="s3cret-token")
+    limits = make(admin_token="s3cret-token-0123456")
 
-    assert "s3cret-token" not in repr(limits)
+    assert "s3cret-token-0123456" not in repr(limits)
     assert (
-        limits.admin_token is not None and limits.admin_token.get_secret_value() == "s3cret-token"
+        limits.admin_token is not None
+        and limits.admin_token.get_secret_value() == "s3cret-token-0123456"
     )
 
 
@@ -95,3 +96,16 @@ def test_the_app_refuses_to_start_with_an_unsafe_limit(monkeypatch: pytest.Monke
     finally:
         monkeypatch.delenv("RISK_RISK_PER_TRADE_PCT")
         get_risk_limits.cache_clear()
+
+
+@pytest.mark.parametrize("token", [" ", "a", "short-token", "                "])
+def test_a_weak_admin_token_is_rejected(token: str) -> None:
+    with pytest.raises(ValidationError, match="at least 16 characters"):
+        make(admin_token=token)
+
+
+def test_limits_cannot_be_changed_after_validation() -> None:
+    limits = make()
+
+    with pytest.raises(ValidationError):
+        limits.risk_per_trade_pct = D("50")  # type: ignore[misc]
