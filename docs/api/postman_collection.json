@@ -6,6 +6,88 @@
   },
   "item": [
     {
+      "name": "backtests",
+      "item": [
+        {
+          "name": "List backtest runs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/backtests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "backtests"
+              ],
+              "variable": []
+            },
+            "description": "List backtest runs\n\nNewest first. Past results with simulated costs: not a forecast and not advice.\n\nDocumented responses: 200, 422"
+          }
+        },
+        {
+          "name": "One backtest run in full",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"has request id\", () => pm.response.to.have.header(\"X-Request-ID\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/backtests/:run_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "backtests",
+                ":run_id"
+              ],
+              "variable": [
+                {
+                  "key": "run_id",
+                  "value": "",
+                  "description": "path parameter"
+                }
+              ]
+            },
+            "description": "One backtest run in full\n\nDocumented responses: 200, 404, 422"
+          }
+        }
+      ]
+    },
+    {
       "name": "data",
       "item": [
         {

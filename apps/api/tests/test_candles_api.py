@@ -110,3 +110,9 @@ def test_signal_risk_record_is_mapped_for_a_fresh_actionable_buy() -> None:
     assert not vetoed.actionable and vetoed.risk.plan is None  # no plan for a refused BUY
     assert not vetoed.risk.portfolio_tracked
     assert vetoed.risk.rules_action == "BUY" and vetoed.risk.vetoes[0].code == "max_open_positions"
+
+
+def test_backtest_filters_are_validated(client: TestClient) -> None:
+    for params in ({"timeframe": "7m"}, {"segment": "other"}, {"limit": 0}, {"limit": 101}):
+        assert client.get("/backtests", params=params).status_code == 422, params
+    assert client.get("/backtests/abc").status_code == 422

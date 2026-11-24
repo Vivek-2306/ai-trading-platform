@@ -1,6 +1,7 @@
 """The Postman collection must cover every endpoint the API exposes."""
 
 import importlib.util
+import re
 from pathlib import Path
 from types import ModuleType
 
@@ -26,7 +27,9 @@ def test_collection_has_every_endpoint() -> None:
         item["request"]["url"]["raw"] for folder in collection["item"] for item in folder["item"]
     }
 
-    assert urls == {"{{baseUrl}}" + path for path in schema["paths"]}
+    # Postman writes path parameters as :name where OpenAPI writes {name}.
+    expected = {"{{baseUrl}}" + re.sub(r"{(\w+)}", r":\1", path) for path in schema["paths"]}
+    assert urls == expected
 
 
 def test_collection_is_deterministic() -> None:

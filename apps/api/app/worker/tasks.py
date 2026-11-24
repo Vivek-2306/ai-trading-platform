@@ -151,3 +151,42 @@ async def _run_signals() -> dict[str, str]:
 def run_signals() -> dict[str, str]:
     """Produce a signal for the newest closed candle of every tracked instrument."""
     return asyncio.run(_run_signals())
+
+
+async def _backtest(
+    symbol: str, timeframe: str, options: dict[str, str]
+) -> list[dict[str, object]]:
+    from decimal import Decimal
+
+    from app.backtest.engine import BacktestConfig
+    from app.backtest.runner import run_and_store
+    from app.data.models import AssetClass
+
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    spec = InstrumentSpec(
+        "binance", symbol, AssetClass.GOLD if symbol.startswith("PAXG") else AssetClass.CRYPTO
+    )
+    config = BacktestConfig(
+        symbol=symbol,
+        timeframe=timeframe,
+        capital=Decimal(options.get("capital", "1000")),
+        fee_pct=Decimal(options.get("fee_pct", "0.1")),
+        slippage_bps=Decimal(options.get("slippage_bps", "5")),
+        latency_candles=int(options.get("latency", "0")),
+    )
+    try:
+        runs = await run_and_store(sessions, spec, config)  # never spends the locked period
+        return [{"id": r.id, "segment": r.segment} for r in runs]
+    finally:
+        await engine.dispose()
+
+
+@celery_app.task(name="app.worker.tasks.run_backtest")
+def run_backtest_task(
+    symbol: str, timeframe: str, options: dict[str, str] | None = None
+) -> list[dict[str, object]]:
+    """Tuning run and walk-forward for one instrument. Judging the locked out-of-sample period
+    is deliberately not available here: it is a one-time decision made from the command line."""
+    return asyncio.run(_backtest(symbol, timeframe, options or {}))

@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List backtest runs
+         * @description Newest first. Past results with simulated costs: not a forecast and not advice.
+         */
+        get: operations["list_backtests_backtests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/backtests/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One backtest run in full */
+        get: operations["get_backtest_backtests__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/data/candles": {
         parameters: {
             query?: never;
@@ -229,6 +266,110 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BacktestDetail */
+        BacktestDetail: {
+            /** Benchmark */
+            benchmark: {
+                [key: string]: unknown;
+            };
+            /** Candle Count */
+            candle_count: number;
+            /** Code Version */
+            code_version: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Config Hash */
+            config_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Data Fingerprint */
+            data_fingerprint: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Equity */
+            equity: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: number;
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            };
+            /**
+             * Range End
+             * Format: date-time
+             */
+            range_end: string;
+            /**
+             * Range Start
+             * Format: date-time
+             */
+            range_start: string;
+            /** Segment */
+            segment: string;
+            /** Strategy */
+            strategy: string;
+            /** Symbol */
+            symbol: string;
+            /** Timeframe */
+            timeframe: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Trades */
+            trades: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** BacktestSummary */
+        BacktestSummary: {
+            /** Benchmark */
+            benchmark: {
+                [key: string]: unknown;
+            };
+            /** Candle Count */
+            candle_count: number;
+            /** Code Version */
+            code_version: string;
+            /** Config Hash */
+            config_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            };
+            /**
+             * Range End
+             * Format: date-time
+             */
+            range_end: string;
+            /**
+             * Range Start
+             * Format: date-time
+             */
+            range_start: string;
+            /** Segment */
+            segment: string;
+            /** Strategy */
+            strategy: string;
+            /** Symbol */
+            symbol: string;
+            /** Timeframe */
+            timeframe: string;
+        };
         /**
          * CandleOut
          * @description Prices are decimal strings in JSON, so no precision is lost.
@@ -577,6 +718,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_backtests_backtests_get: {
+        parameters: {
+            query?: {
+                symbol?: string | null;
+                timeframe?: components["schemas"]["Timeframe"] | null;
+                segment?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_backtest_backtests__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetail"];
+                };
+            };
+            /** @description Unknown run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     candles_data_candles_get: {
         parameters: {
             query: {

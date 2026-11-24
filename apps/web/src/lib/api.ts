@@ -256,3 +256,130 @@ export async function getRiskStatus(): Promise<RiskStatus | null> {
     return null;
   }
 }
+
+/** Numbers in `metrics` are floats, money is an exact decimal string, and a metric that could
+ * not be computed (no losses, no trades) is null. */
+export type BacktestMetrics = {
+  trades?: number;
+  wins?: number;
+  losses?: number;
+  win_rate_pct?: number | null;
+  profit_factor?: number | null;
+  expectancy?: string | null;
+  expectancy_r?: number | null;
+  total_return_pct?: number;
+  max_drawdown_pct?: number;
+  sharpe?: number | null;
+  exposure_pct?: number;
+  fees_paid?: string;
+  gross_pnl?: string;
+  net_pnl?: string;
+  initial_equity?: string;
+  final_equity?: string;
+  longest_losing_streak?: number;
+  warnings?: string[];
+  // walk-forward summary
+  windows?: number;
+  profitable_windows?: number;
+  mean_window_return_pct?: number | null;
+  best_window_return_pct?: number | null;
+  worst_window_return_pct?: number | null;
+  total_trades?: number;
+};
+
+export type BacktestBenchmark = {
+  strategy_return_pct?: number;
+  benchmark_return_pct?: number;
+  excess_return_pct?: number;
+  strategy_max_drawdown_pct?: number;
+  benchmark_max_drawdown_pct?: number;
+  beat_on_return?: boolean;
+  beat_on_drawdown?: boolean;
+  verdict?: string;
+};
+
+export type BacktestSummary = {
+  id: number;
+  created_at: string;
+  symbol: string;
+  timeframe: string;
+  strategy: string;
+  segment: "tuning" | "walk_forward" | "oos" | string;
+  config_hash: string;
+  range_start: string;
+  range_end: string;
+  candle_count: number;
+  code_version: string;
+  metrics: BacktestMetrics;
+  benchmark: BacktestBenchmark;
+};
+
+export type BacktestTrade = {
+  entry_ts: string;
+  exit_ts: string;
+  entry_price: string;
+  exit_price: string;
+  quantity: string;
+  pnl: string;
+  fees: string;
+  r_multiple: string;
+  exit_reason: string;
+  bars_held: number;
+};
+
+export type BacktestDetail = BacktestSummary & {
+  config: Record<string, string | number>;
+  data_fingerprint: string;
+  /** The latest trades only; `trade_count` is how many there were in all. */
+  trades: BacktestTrade[];
+  trade_count?: number;
+  equity: { times?: string[]; strategy?: number[]; benchmark?: number[] };
+  details: {
+    windows?: {
+      start: string;
+      end: string;
+      trades: number;
+      return_pct: number;
+      max_drawdown_pct: number;
+    }[];
+    train_size?: number;
+    test_size?: number;
+    note?: string;
+    oos_start?: string;
+  };
+};
+
+/** Stored backtest runs, newest first, or null if the API cannot answer. */
+export async function getBacktests(limit = 30): Promise<BacktestSummary[] | null> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data } = await serverApi().GET("/backtests", {
+      params: { query: { limit } },
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    return (data as BacktestSummary[] | undefined) ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "backtests_unavailable");
+    return null;
+  }
+}
+
+/** One run in full, `undefined` if it does not exist, null if the API cannot answer. */
+export async function getBacktest(id: number): Promise<BacktestDetail | null | undefined> {
+  const requestId = safeRequestId((await headers()).get("x-request-id"));
+  try {
+    const { data, response } = await serverApi().GET("/backtests/{run_id}", {
+      params: { path: { run_id: id } },
+      cache: "no-store",
+      headers: { "x-request-id": requestId },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.status === 404) return undefined;
+    return (data as BacktestDetail | undefined) ?? null;
+  } catch (error) {
+    logger.warn({ request_id: requestId, err: String(error) }, "backtest_unavailable");
+    return null;
+  }
+}

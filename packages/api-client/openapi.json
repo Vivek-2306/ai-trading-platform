@@ -1,6 +1,199 @@
 {
   "components": {
     "schemas": {
+      "BacktestDetail": {
+        "properties": {
+          "benchmark": {
+            "additionalProperties": true,
+            "title": "Benchmark",
+            "type": "object"
+          },
+          "candle_count": {
+            "title": "Candle Count",
+            "type": "integer"
+          },
+          "code_version": {
+            "title": "Code Version",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_fingerprint": {
+            "title": "Data Fingerprint",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "equity": {
+            "additionalProperties": true,
+            "title": "Equity",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "range_end": {
+            "format": "date-time",
+            "title": "Range End",
+            "type": "string"
+          },
+          "range_start": {
+            "format": "date-time",
+            "title": "Range Start",
+            "type": "string"
+          },
+          "segment": {
+            "title": "Segment",
+            "type": "string"
+          },
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          },
+          "trades": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "symbol",
+          "timeframe",
+          "strategy",
+          "segment",
+          "config_hash",
+          "range_start",
+          "range_end",
+          "candle_count",
+          "code_version",
+          "metrics",
+          "benchmark",
+          "config",
+          "data_fingerprint",
+          "trades",
+          "trade_count",
+          "equity",
+          "details"
+        ],
+        "title": "BacktestDetail",
+        "type": "object"
+      },
+      "BacktestSummary": {
+        "properties": {
+          "benchmark": {
+            "additionalProperties": true,
+            "title": "Benchmark",
+            "type": "object"
+          },
+          "candle_count": {
+            "title": "Candle Count",
+            "type": "integer"
+          },
+          "code_version": {
+            "title": "Code Version",
+            "type": "string"
+          },
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "range_end": {
+            "format": "date-time",
+            "title": "Range End",
+            "type": "string"
+          },
+          "range_start": {
+            "format": "date-time",
+            "title": "Range Start",
+            "type": "string"
+          },
+          "segment": {
+            "title": "Segment",
+            "type": "string"
+          },
+          "strategy": {
+            "title": "Strategy",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "symbol",
+          "timeframe",
+          "strategy",
+          "segment",
+          "config_hash",
+          "range_start",
+          "range_end",
+          "candle_count",
+          "code_version",
+          "metrics",
+          "benchmark"
+        ],
+        "title": "BacktestSummary",
+        "type": "object"
+      },
       "CandleOut": {
         "description": "Prices are decimal strings in JSON, so no precision is lost.",
         "properties": {
@@ -840,6 +1033,152 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/backtests": {
+      "get": {
+        "description": "Newest first. Past results with simulated costs: not a forecast and not advice.",
+        "operationId": "list_backtests_backtests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeframe",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Timeframe"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timeframe"
+            }
+          },
+          {
+            "in": "query",
+            "name": "segment",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(tuning|walk_forward|oos)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Segment"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BacktestSummary"
+                  },
+                  "title": "Response List Backtests Backtests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List backtest runs",
+        "tags": [
+          "backtests"
+        ]
+      }
+    },
+    "/backtests/{run_id}": {
+      "get": {
+        "operationId": "get_backtest_backtests__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Unknown run"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One backtest run in full",
+        "tags": [
+          "backtests"
+        ]
+      }
+    },
     "/data/candles": {
       "get": {
         "description": "The newest `limit` candles (oldest first). Page back in time with `next_before`.",
