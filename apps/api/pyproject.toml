@@ -98,8 +98,8 @@ plugins = ["pydantic.mypy"]
 files = ["app", "tests"]
 
 [[tool.mypy.overrides]]
-# ccxt and ta-lib ship no type hints.
-module = ["ccxt", "ccxt.*", "talib", "talib.*"]
+# ccxt and ta-lib ship no type hints; the `ml` group is not installed in the default CI job.
+module = ["ccxt", "ccxt.*", "talib", "talib.*", "lightgbm", "lightgbm.*", "sklearn", "sklearn.*", "mlflow", "mlflow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
