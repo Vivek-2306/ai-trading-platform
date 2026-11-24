@@ -51,6 +51,11 @@ async def _main(args: argparse.Namespace) -> int:
             for combo, runs in results.items():
                 print(f"{combo.strategy} {combo.symbol} {combo.timeframe}: {len(runs)} runs")  # noqa: T201
             return 0
+        if args.command == "research-report":
+            from app.scalping.report import write_report
+
+            print(await write_report(sessions))  # noqa: T201
+            return 0
         if args.command == "rerun":
             result = await rerun(sessions, args.run_id)
             print("identical" if result.identical else "DIFFERENT: " + "; ".join(result.reasons))  # noqa: T201
@@ -109,6 +114,7 @@ def main() -> None:
         "--judge-oos", action="store_true", help="spend the locked periods (once)"
     )
     research.add_argument("--yes", action="store_true", help="confirm --judge-oos")
+    sub.add_parser("research-report", help="write docs/SCALPING_RESEARCH.md from stored runs")
     again = sub.add_parser("rerun")
     again.add_argument("run_id", type=int)
     raise SystemExit(asyncio.run(_main(parser.parse_args())))

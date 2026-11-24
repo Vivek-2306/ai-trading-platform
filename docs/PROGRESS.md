@@ -67,7 +67,12 @@ is roughly flat). The locked out-of-sample period for the swing rules is still u
 
 ## In progress
 
-Phase 9b. 1m/5m history is being backfilled for BTC and ETH (log `/tmp/aitp-run/backfill-scalp.log`).
+Phase 9b is implemented (AITP-75 to 80); self-review and PR next.
+
+Phase 9b result: **no-go**. All 12 strategy/instrument/timeframe combinations lose money out of sample
+(profit factor 0.01 to 0.30); average gross move per trade is about zero or negative before the ~20 bps
+round-trip fee, so the rules have no edge. Details in `docs/SCALPING_RESEARCH.md`. Scalping locks are spent;
+the swing lock is untouched.
 
 ## Next up
 
