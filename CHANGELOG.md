@@ -8,6 +8,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Risk engine, part 1 (`app/risk/plan.py`): ATR-based stop-loss, target and risk-to-reward for a long trade in exact `Decimal` maths. Stops round away from the entry and targets toward it, so rounding only makes a plan more cautious. Vetoes for a bad entry or ATR, a stop at or below zero, a stop too far away, and a risk-to-reward below the minimum. Adds `hypothesis` for property tests (AITP-62).
 - Indicator library (`app/analysis/indicators.py`, TA-Lib): SMA, EMA, RSI, MACD, ATR, Bollinger bands and a rolling VWAP. Warm-up values are NaN, never invented; tested against independent long-hand implementations. `ta-lib` and `numpy` are now runtime dependencies (AITP-55).
 - Feature pipeline (`app/analysis/features.py`): indicator values aligned to every candle for any timeframe, and `find_lookahead`, which proves no feature at candle t changes when later candles are removed (a deliberately leaky feature is caught) (AITP-56).
 - `signals` table (migration `0004`): action BUY/SELL/HOLD/NO_TRADE, confidence 0 to 1, reasons and the feature inputs as JSON, rule version; one row per instrument, timeframe, candle and rule version. Append-only: the database rejects UPDATE, DELETE and TRUNCATE (AITP-57).
