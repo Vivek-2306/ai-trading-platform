@@ -12,6 +12,12 @@ Results to remember: `rules-v2` does not beat buy-and-hold (Phase 9). Phase 9b: 
 out of sample (`docs/SCALPING_RESEARCH.md`); no scalping goes to paper trading. The swing out-of-sample lock is
 still unspent (owner decision pending, needed at AITP-85).
 
+Phase 10 status: AITP-81 to 84 done. On the tuning region the model does not beat the training base rate
+(AUC 0.50 to 0.56, Brier worse than the prior on BTC and ETH 1h and 1d), and 1h entries at p >= 0.50 hit the target
+38 to 41% of the time against a cost-adjusted break-even of 47 to 50%. Tuning backtests: 1h -16% (BTC), -25% (ETH);
+1d +6.6% / +2.6% on about 90 trades. AITP-85 (judge the locked swing period once) is **Needs Decision**: the owner
+chooses whether to spend the swing lock; recommendation is not to, because the model already fails on tuning data.
+
 ## Last completed
 
 - Setup Step 0 (answers) and Step 1 (prerequisites: git, gh as `Vivek-2306`, Node 24.1, pnpm 9.15,
